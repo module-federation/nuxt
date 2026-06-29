@@ -1,9 +1,3 @@
-<script setup lang="ts">
-import { defineAsyncComponent } from "vue";
-import HostCard from "./components/HostCard.vue";
-import HostSsrComponent from "./components/HostSsrComponent.vue";
-</script>
-
 <template>
   <main class="examples">
     <div class="host-column">
