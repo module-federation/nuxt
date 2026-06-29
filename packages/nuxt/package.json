@@ -1,0 +1,14 @@
+{
+  "name": "@module-federation/nuxt",
+  "version": "0.0.1",
+  "exports": {
+    ".": "./federation.ts"
+  },
+  "dependencies": {
+    "@module-federation/vite": "1.16.4",
+    "@nuxt/kit": "4.4.7"
+  },
+  "devDependencies": {
+    "@types/node": "24"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "name": "nuxt-remote",
+  "type": "module",
+  "scripts": {
+    "build": "nuxt build",
+    "predev": "nuxt prepare",
+    "dev": "nuxt dev --port 4174",
+    "generate": "nuxt generate",
+    "preview": "nuxt preview --port 4174"
+  },
+  "dependencies": {
+    "@module-federation/nuxt": "workspace:*",
+    "nuxt": "4.3.1",
+    "vue": "3.5.29",
+    "vue-router": "4.6.4"
+  }
+}

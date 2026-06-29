@@ -3,10 +3,11 @@
   "private": true,
   "scripts": {
     "build": "turbo run build",
+    "preview": "turbo run preview",
     "dev": "turbo run dev",
-    "lint": "turbo run lint",
-    "format": "prettier --write \"**/*.{ts,tsx,md}\"",
-    "check-types": "turbo run check-types"
+    "dev:host": "turbo run dev --filter=nuxt-host",
+    "dev:remote": "turbo run dev --filter=nuxt-remote",
+    "format": "prettier --write \"**/*.{ts,vue,md,json}\""
   },
   "devDependencies": {
     "prettier": "^3.7.4",
