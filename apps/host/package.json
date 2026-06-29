@@ -1,0 +1,19 @@
+{
+  "name": "nuxt-host",
+  "type": "module",
+  "scripts": {
+    "build": "pnpm --filter @module-federation/nuxt build && nuxt build",
+    "predev": "pnpm --filter @module-federation/nuxt build && nuxt prepare",
+    "dev": "nuxt dev --port 4173",
+    "generate": "pnpm --filter @module-federation/nuxt build && nuxt generate",
+    "preview": "pnpm --filter @module-federation/nuxt build && nuxt preview --port 4173",
+    "typecheck": "pnpm --filter @module-federation/nuxt build && nuxt typecheck"
+  },
+  "dependencies": {
+    "@module-federation/nuxt": "workspace:*",
+    "@pinia/nuxt": "0.11.3",
+    "nuxt": "4.3.1",
+    "vue": "3.5.29",
+    "vue-router": "4.6.4"
+  }
+}
