@@ -2,6 +2,7 @@ import type { ModuleFederationOptions } from "@module-federation/vite";
 
 export const DEFAULT_BASE = "/_mf";
 export const DEFAULT_EXPOSED_DIR = "~/components/exposed";
+export const DEFAULT_MANIFEST_FETCH_TIMEOUT_MS = 500;
 export const REMOTE_ENTRY_ASSETS = [
   "remoteEntry.js",
   "remoteEntry.ssr.js",
@@ -11,19 +12,18 @@ export const REMOTE_ENTRY_ASSETS = [
 export interface ModuleOptions {
   base?: string;
   exposedDir?: string;
+  manifestFetchTimeoutMs?: number;
+  manifestMetadata?: Record<string, unknown>;
+  remoteComponents?: Record<string, string[]>;
   config?: Partial<ModuleFederationOptions>;
 }
 
 export const defaultModuleOptions = {
   base: DEFAULT_BASE,
   exposedDir: DEFAULT_EXPOSED_DIR,
+  manifestFetchTimeoutMs: DEFAULT_MANIFEST_FETCH_TIMEOUT_MS,
   config: {
     remotes: {},
-    shared: {
-      // TODO: confirm heuristic for versions - based on package.json
-      vue: { singleton: true, requiredVersion: "3.5.29" },
-      "vue-router": { singleton: true, requiredVersion: "4.6.4" },
-    },
     exposes: {},
   },
 } satisfies ModuleOptions;

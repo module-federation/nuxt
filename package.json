@@ -4,18 +4,22 @@
   "scripts": {
     "build": "turbo run build",
     "preview": "turbo run preview",
-    "dev": "turbo run dev",
-    "dev:host": "turbo run dev --filter=nuxt-host",
-    "dev:remote": "turbo run dev --filter=nuxt-remote",
-    "format": "prettier --write \"**/*.{ts,vue,md,json}\""
+    "dev": "pnpm --filter @module-federation/nuxt build && turbo run dev",
+    "dev:host": "pnpm --filter @module-federation/nuxt build && turbo run dev --filter=nuxt-host",
+    "dev:remote": "pnpm --filter @module-federation/nuxt build && turbo run dev --filter=nuxt-remote",
+    "format": "prettier --write \"**/*.{ts,vue,md,json}\"",
+    "pack:nuxt": "pnpm --filter @module-federation/nuxt run pack:dry",
+    "publish:nuxt": "pnpm --filter @module-federation/nuxt publish",
+    "typecheck": "turbo run typecheck"
   },
   "devDependencies": {
     "prettier": "^3.7.4",
     "turbo": "^2.10.0",
-    "typescript": "5.9.2"
+    "typescript": "5.9.2",
+    "vue-tsc": "^3.2.2"
   },
   "packageManager": "pnpm@9.0.0",
   "engines": {
-    "node": ">=18"
+    "node": ">=20.19.0"
   }
 }

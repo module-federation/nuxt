@@ -2,11 +2,12 @@
   "name": "nuxt-remote",
   "type": "module",
   "scripts": {
-    "build": "nuxt build",
-    "predev": "nuxt prepare",
+    "build": "pnpm --filter @module-federation/nuxt build && nuxt build",
+    "predev": "pnpm --filter @module-federation/nuxt build && nuxt prepare",
     "dev": "nuxt dev --port 4174",
-    "generate": "nuxt generate",
-    "preview": "nuxt preview --port 4174"
+    "generate": "pnpm --filter @module-federation/nuxt build && nuxt generate",
+    "preview": "pnpm --filter @module-federation/nuxt build && nuxt preview --port 4174",
+    "typecheck": "pnpm --filter @module-federation/nuxt build && nuxt typecheck"
   },
   "dependencies": {
     "@module-federation/nuxt": "workspace:*",

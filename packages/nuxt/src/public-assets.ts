@@ -1,9 +1,24 @@
-import { type useNuxt } from "@nuxt/kit";
+import type { HookResult, Nuxt } from "@nuxt/schema";
 import { cpSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { REMOTE_ENTRY_ASSETS } from "./options";
 
-type Nuxt = ReturnType<typeof useNuxt>;
+type NitroPublicAssetsContext = {
+  options: {
+    buildDir: string;
+    output: {
+      publicDir: string;
+    };
+  };
+};
+
+declare module "@nuxt/schema" {
+  interface NuxtHooks {
+    "nitro:build:public-assets": (
+      nitro: NitroPublicAssetsContext,
+    ) => HookResult;
+  }
+}
 
 export function registerRemoteEntryAssetCopy(nuxt: Nuxt, publicBase: string) {
   const outputBase = publicBase.replace(/^\//, "");

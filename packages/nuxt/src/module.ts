@@ -1,4 +1,5 @@
 import { defineNuxtModule, useNuxt } from "@nuxt/kit";
+import type { NuxtModule } from "@nuxt/schema";
 import { registerExposedComponents, resolveExposedDir } from "./exposes";
 import {
   defaultModuleOptions,
@@ -6,27 +7,41 @@ import {
   type ModuleOptions,
 } from "./options";
 import { registerRemoteEntryAssetCopy } from "./public-assets";
-import { registerRemoteComponents } from "./remotes";
+import { registerRemoteComponents, resolveRemoteComponents } from "./remotes";
 import { registerRemoteEntryRoutes } from "./routes";
+import { resolveSharedConfig } from "./shared";
 import { registerCorsPlugin, registerFederationPlugin } from "./vite";
 
-export default defineNuxtModule<ModuleOptions>({
+const module: NuxtModule<ModuleOptions> = defineNuxtModule<ModuleOptions>({
   meta: {
     name: "@module-federation/nuxt",
     configKey: "moduleFederation",
   },
   defaults: defaultModuleOptions,
-  setup(options) {
+  async setup(options) {
     const nuxt = useNuxt();
     const publicBase = normalizeBase(options.base);
     const exposedDir = resolveExposedDir(nuxt, options.exposedDir);
     const exposed = registerExposedComponents(nuxt, exposedDir);
-    const remoteNames = Object.keys(options.config?.remotes || {});
+    const config = {
+      ...options.config,
+      shared: resolveSharedConfig(nuxt, options.config?.shared),
+    };
+    const remoteComponents = await resolveRemoteComponents({
+      configured: options.remoteComponents,
+      manifestFetchTimeoutMs: options.manifestFetchTimeoutMs,
+      remotes: config.remotes,
+    });
 
     registerRemoteEntryRoutes(nuxt, publicBase);
-    registerRemoteComponents(remoteNames);
+    registerRemoteComponents(
+      remoteComponents,
+      Object.keys(config.remotes || {}),
+    );
     registerRemoteEntryAssetCopy(nuxt, publicBase);
-    registerFederationPlugin(options, exposed);
+    registerFederationPlugin({ ...options, config }, exposed);
     registerCorsPlugin();
   },
 });
+
+export default module;

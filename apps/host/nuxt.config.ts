@@ -12,6 +12,9 @@ export default defineNuxtConfig({
   },
 
   moduleFederation: {
+    remoteComponents: {
+      remote: ["Counter", "Widget"],
+    },
     config: {
       name: "host",
       hostInitInjectLocation: "entry",

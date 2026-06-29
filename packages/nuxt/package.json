@@ -1,14 +1,48 @@
 {
   "name": "@module-federation/nuxt",
   "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "build": "tsdown",
+    "dev": "tsdown --watch",
+    "pack:dry": "npm pack --dry-run",
+    "prepack": "pnpm run build",
+    "prepublishOnly": "pnpm run typecheck && pnpm run build",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "files": [
+    "dist"
+  ],
+  "main": "./dist/federation.mjs",
+  "module": "./dist/federation.mjs",
+  "types": "./dist/federation.d.mts",
   "exports": {
-    ".": "./federation.ts"
+    ".": {
+      "types": "./dist/federation.d.mts",
+      "import": "./dist/federation.mjs",
+      "default": "./dist/federation.mjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "engines": {
+    "node": ">=20.19.0"
   },
   "dependencies": {
     "@module-federation/vite": "1.16.4",
-    "@nuxt/kit": "4.4.7"
+    "@nuxt/kit": "^4.3.0",
+    "@nuxt/schema": "^4.3.0"
+  },
+  "peerDependencies": {
+    "nuxt": "^4.3.0"
   },
   "devDependencies": {
-    "@types/node": "24"
+    "@types/node": "24",
+    "nuxt": "4.3.1",
+    "tsdown": "^0.21.0",
+    "vue-tsc": "3.2.2"
   }
 }
