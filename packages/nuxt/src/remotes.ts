@@ -30,7 +30,7 @@ export async function resolveRemoteComponents(options: {
       const exposedNames =
         manifestComponents.length > 0
           ? manifestComponents
-          : options.configured?.[remoteName] || [];
+          : normalizeComponentExposes(options.configured?.[remoteName] || []);
 
       return exposedNames.map((exposedName) =>
         createRemoteComponent(remoteName, exposedName, remoteNames.length),
@@ -241,6 +241,12 @@ function normalizeExposeName(value: string | undefined) {
 
 function isValidComponentExpose(value: string | undefined): value is string {
   return Boolean(value && /^[A-Za-z][\w-]*$/.test(value));
+}
+
+function normalizeComponentExposes(exposes: string[]) {
+  return exposes
+    .map((expose) => normalizeExposeName(expose))
+    .filter(isValidComponentExpose);
 }
 
 function readManifestExposes(manifest: Record<string, unknown>) {
