@@ -54,6 +54,15 @@ export function registerRemoteEntryAssetCopy(
       if (existsSync(src)) {
         ensureParentDir(dest);
 
+        if (file === remoteEntryFile) {
+          copyOriginalRemoteEntryAsset(
+            src,
+            nitro.options.output.publicDir,
+            remoteEntryFile,
+            outputBase,
+          );
+        }
+
         if (file === manifestFile) {
           writeFileSync(
             dest,
@@ -80,6 +89,19 @@ export function registerRemoteEntryAssetCopy(
       }
     }
   });
+}
+
+function copyOriginalRemoteEntryAsset(
+  src: string,
+  publicDir: string,
+  remoteEntryFile: string,
+  outputBase: string,
+) {
+  if (!outputBase) return;
+
+  const dest = resolve(publicDir, remoteEntryFile);
+  ensureParentDir(dest);
+  cpSync(src, dest);
 }
 
 function ensureParentDir(path: string) {
