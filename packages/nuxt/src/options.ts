@@ -24,5 +24,5 @@ export const defaultModuleOptions = {
 } satisfies ModuleOptions;
 
 export function normalizeBase(base = DEFAULT_BASE) {
-  return base.replace(/^\/?/, "/");
+  return `/${base}`.replace(/\/+/g, "/").replace(/\/$/, "") || "/";
 }

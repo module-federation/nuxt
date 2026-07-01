@@ -257,6 +257,10 @@ export function registerCorsPlugin() {
 }
 
 function resolveManifestOptions(options: ModuleOptions) {
+  if (options.config?.manifest === false) {
+    return false;
+  }
+
   if (
     options.config?.manifest &&
     typeof options.config.manifest !== "boolean"
