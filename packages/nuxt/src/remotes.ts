@@ -1,14 +1,8 @@
 import type { ModuleFederationOptions } from "@module-federation/vite";
-import {
-  addComponent,
-  addTemplate,
-  addTypeTemplate,
-  addVitePlugin,
-} from "@nuxt/kit";
+import { addComponent, addTemplate, addTypeTemplate } from "@nuxt/kit";
 import { isJsonObject, parseJsonObject, readString } from "./json";
 import { DEFAULT_MANIFEST_FETCH_TIMEOUT_MS } from "./options";
 
-const SERVER_REMOTE_PREFIX = "\0module-federation:nuxt:ssr-remote:";
 type RemoteConfig = NonNullable<ModuleFederationOptions["remotes"]>[string];
 
 export interface RemoteComponent {
@@ -49,25 +43,49 @@ export async function resolveRemoteComponents(options: {
 
 export function registerRemoteComponents(
   components: RemoteComponent[],
-  remoteNames = [
-    ...new Set(components.map((component) => component.remoteName)),
-  ],
+  options: { server?: boolean } = {},
 ) {
   if (components.length > 0) {
+    const renderOnServer = options.server !== false;
+
     addTemplate({
       filename: "remote-components.mjs",
       async getContents() {
         return `
-        import { defineAsyncComponent } from "vue";
+        import { defineAsyncComponent, defineComponent, h, onMounted, ref } from "vue";
+
+        const createClientOnlyRemote = (name, component) => defineComponent({
+          name,
+          setup(_, { attrs, slots }) {
+            const mounted = ref(false);
+            onMounted(() => {
+              mounted.value = true;
+            });
+
+            return () => mounted.value ? h(component, attrs, slots) : null;
+          },
+        });
 
         ${components
-          .map(
-            (component) => `
-            export const ${component.exportName} = defineAsyncComponent({
-              loader: () => import("${component.importPath}").then((m) => m.default || m),
-              suspensible: true,
-            });
-          `,
+          .map((component) =>
+            renderOnServer
+              ? `
+                  export const ${component.exportName} = defineAsyncComponent({
+                    loader: () => import("${component.importPath}").then((m) => m.default || m),
+                    suspensible: true,
+                  });
+                `
+              : `
+                  const ${component.exportName}Client = defineAsyncComponent({
+                    loader: () => import("${component.importPath}").then((m) => m.default || m),
+                    suspensible: false,
+                  });
+
+                  export const ${component.exportName} = createClientOnlyRemote(
+                    "${component.componentName}",
+                    ${component.exportName}Client,
+                  );
+                `,
           )
           .join("\n")}
       `;
@@ -112,8 +130,6 @@ export function registerRemoteComponents(
       },
     });
   }
-
-  registerServerRemoteStubs(remoteNames);
 }
 
 function createRemoteComponent(
@@ -251,37 +267,4 @@ function toPascalCase(value: string) {
     .filter(Boolean)
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join("");
-}
-
-function registerServerRemoteStubs(remoteNames: string[]) {
-  if (remoteNames.length === 0) return;
-
-  addVitePlugin(
-    {
-      name: "module-federation:nuxt:ssr-remotes",
-      enforce: "pre",
-      resolveId(id) {
-        if (
-          remoteNames.some((name) => id === name || id.startsWith(`${name}/`))
-        ) {
-          return SERVER_REMOTE_PREFIX + id;
-        }
-      },
-      load(id) {
-        if (!id.startsWith(SERVER_REMOTE_PREFIX)) return;
-
-        return `
-          import { defineComponent } from "vue";
-
-          export default defineComponent({
-            name: "ModuleFederationRemoteStub",
-            setup() {
-              return () => null;
-            },
-          });
-        `;
-      },
-    },
-    { client: false },
-  );
 }

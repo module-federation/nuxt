@@ -11,7 +11,7 @@
   },
   "dependencies": {
     "@module-federation/nuxt": "workspace:*",
-    "nuxt": "4.3.1",
+    "nuxt": "4.4.8",
     "vue": "3.5.29",
     "vue-router": "4.6.4"
   }

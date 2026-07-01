@@ -34,12 +34,14 @@ const module: NuxtModule<ModuleOptions> = defineNuxtModule<ModuleOptions>({
     });
 
     registerRemoteEntryRoutes(nuxt, publicBase);
-    registerRemoteComponents(
-      remoteComponents,
-      Object.keys(config.remotes || {}),
-    );
+    registerRemoteComponents(remoteComponents, { server: !nuxt.options.dev });
     registerRemoteEntryAssetCopy(nuxt, publicBase);
-    registerFederationPlugin({ ...options, config }, exposed);
+    registerFederationPlugin(
+      { ...options, config },
+      exposed,
+      nuxt.options.rootDir,
+      { server: !nuxt.options.dev },
+    );
     registerCorsPlugin();
   },
 });

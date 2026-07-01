@@ -1,6 +1,5 @@
 import { resolveAlias, type useNuxt } from "@nuxt/kit";
 import { existsSync } from "node:fs";
-import { relative } from "node:path";
 import { DEFAULT_EXPOSED_DIR } from "./options";
 
 type Nuxt = ReturnType<typeof useNuxt>;
@@ -28,10 +27,7 @@ export function registerExposedComponents(nuxt: Nuxt, exposedDir: string) {
     for (const component of components) {
       if (!component.filePath.startsWith(exposedDir)) continue;
 
-      exposed[`./${component.pascalName}`] = `./${relative(
-        nuxt.options.rootDir,
-        component.filePath,
-      )}`;
+      exposed[`./${component.pascalName}`] = component.filePath;
     }
   });
 

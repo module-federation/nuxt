@@ -5,18 +5,8 @@
     </div>
     <div class="component-grid">
       <HostSsrComponent />
-      <Suspense>
-        <RemoteWidget />
-        <template #fallback>
-          <div>Loading remote widget...</div>
-        </template>
-      </Suspense>
-      <Suspense>
-        <RemoteCounter />
-        <template #fallback>
-          <div>Loading remote counter...</div>
-        </template>
-      </Suspense>
+      <RemoteWidget />
+      <RemoteCounter />
     </div>
   </main>
 </template>
