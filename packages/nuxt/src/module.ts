@@ -33,7 +33,7 @@ const module: NuxtModule<ModuleOptions> = defineNuxtModule<ModuleOptions>({
       remotes: config.remotes,
     });
 
-    registerRemoteEntryRoutes(nuxt, publicBase);
+    registerRemoteEntryRoutes(nuxt, publicBase, options);
     registerRemoteComponents(remoteComponents, { server: !nuxt.options.dev });
     registerRemoteEntryAssetCopy(nuxt, publicBase, options);
     registerFederationPlugin(

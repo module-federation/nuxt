@@ -1,4 +1,6 @@
 import { addDevServerHandler, extendRouteRules, type useNuxt } from "@nuxt/kit";
+import { resolveFederationAssetFileNames } from "./federation-paths";
+import type { ModuleOptions } from "./options";
 
 type Nuxt = ReturnType<typeof useNuxt>;
 interface NodeRequestEvent {
@@ -15,12 +17,21 @@ interface NodeRequestEvent {
   };
 }
 
-export function registerRemoteEntryRoutes(nuxt: Nuxt, publicBase: string) {
-  extendRouteRules(`${publicBase}/**`, {
-    headers: {
-      "Access-Control-Allow-Origin": "*",
-    },
-  });
+export function registerRemoteEntryRoutes(
+  nuxt: Nuxt,
+  publicBase: string,
+  options: ModuleOptions,
+) {
+  const assetFiles = resolveFederationAssetFileNames(options);
+
+  for (const route of getFederationAssetRoutes(publicBase, assetFiles)) {
+    extendRouteRules(route, {
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+      },
+    });
+  }
+
   extendRouteRules(`${normalizePath(nuxt.options.app.buildAssetsDir)}/**`, {
     headers: {
       "Access-Control-Allow-Origin": "*",
@@ -28,11 +39,15 @@ export function registerRemoteEntryRoutes(nuxt: Nuxt, publicBase: string) {
   });
 
   if (nuxt.options.dev) {
-    registerRemoteEntryDevRedirect(nuxt, publicBase);
+    registerRemoteEntryDevRedirect(nuxt, publicBase, assetFiles);
   }
 }
 
-function registerRemoteEntryDevRedirect(nuxt: Nuxt, publicBase: string) {
+function registerRemoteEntryDevRedirect(
+  nuxt: Nuxt,
+  publicBase: string,
+  assetFiles: string[],
+) {
   const buildAssetsDir = normalizePath(nuxt.options.app.buildAssetsDir);
   const routeBase = normalizePath(publicBase);
   const handler = (event: NodeRequestEvent) => {
@@ -56,9 +71,14 @@ function registerRemoteEntryDevRedirect(nuxt: Nuxt, publicBase: string) {
     event.node.res.end();
   };
 
-  const wildcardRoute = routeBase === "/" ? "/**" : `${routeBase}/**`;
+  if (routeBase === "/") {
+    for (const route of assetFiles.map(normalizePath)) {
+      addDevServerHandler({ route, handler });
+    }
+    return;
+  }
 
-  for (const route of [routeBase, wildcardRoute]) {
+  for (const route of [routeBase, `${routeBase}/**`]) {
     addDevServerHandler({
       route,
       handler,
@@ -66,8 +86,17 @@ function registerRemoteEntryDevRedirect(nuxt: Nuxt, publicBase: string) {
   }
 }
 
+function getFederationAssetRoutes(publicBase: string, assetFiles: string[]) {
+  const routeBase = normalizePath(publicBase);
+  if (routeBase === "/") {
+    return assetFiles.map(normalizePath);
+  }
+
+  return [`${routeBase}/**`];
+}
+
 function normalizePath(path: string) {
-  return `/${path}`.replace(/\/+/g, "/").replace(/\/$/, "");
+  return `/${path}`.replace(/\/+/g, "/").replace(/\/$/, "") || "/";
 }
 
 function resolveBuildAssetUrl(

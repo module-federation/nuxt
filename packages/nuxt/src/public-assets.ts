@@ -8,6 +8,7 @@ import {
 } from "node:fs";
 import { dirname, posix, resolve } from "node:path";
 import {
+  resolveFederationAssetFileNames,
   resolveManifestFileName,
   resolveRemoteEntryFileName,
   resolveSsrRemoteEntryFileName,
@@ -41,7 +42,7 @@ export function registerRemoteEntryAssetCopy(
   const remoteEntryFile = resolveRemoteEntryFileName(options);
   const ssrRemoteEntryFile = resolveSsrRemoteEntryFileName(remoteEntryFile);
   const manifestFile = resolveManifestFileName(options);
-  const remoteEntryFiles = [remoteEntryFile, ssrRemoteEntryFile, manifestFile];
+  const remoteEntryFiles = resolveFederationAssetFileNames(options);
 
   // Nuxt only copies the _nuxt/ subfolder from dist/client/ to .output/public/.
   // Federation entries are moved under publicBase, so their root-relative chunk

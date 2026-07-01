@@ -16,6 +16,20 @@ export function resolveSsrRemoteEntryFileName(remoteEntry: string) {
   return parsed.dir ? posix.join(parsed.dir, fileName) : fileName;
 }
 
+export function resolveFederationAssetFileNames(options: ModuleOptions) {
+  const remoteEntryFile = resolveRemoteEntryFileName(options);
+  const files = [
+    remoteEntryFile,
+    resolveSsrRemoteEntryFileName(remoteEntryFile),
+  ];
+
+  if (options.config?.manifest !== false) {
+    files.push(resolveManifestFileName(options));
+  }
+
+  return files;
+}
+
 export function resolveManifestFileName(options: ModuleOptions) {
   if (
     options.config?.manifest &&
