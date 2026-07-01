@@ -21,6 +21,11 @@ export function registerRemoteEntryRoutes(nuxt: Nuxt, publicBase: string) {
       "Access-Control-Allow-Origin": "*",
     },
   });
+  extendRouteRules(`${normalizePath(nuxt.options.app.buildAssetsDir)}/**`, {
+    headers: {
+      "Access-Control-Allow-Origin": "*",
+    },
+  });
 
   if (nuxt.options.dev) {
     registerRemoteEntryDevRedirect(nuxt, publicBase);
