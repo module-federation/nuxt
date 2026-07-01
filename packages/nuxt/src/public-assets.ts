@@ -6,7 +6,13 @@ import {
   readFileSync,
   writeFileSync,
 } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { dirname, posix, resolve } from "node:path";
+import {
+  resolveManifestFileName,
+  resolveRemoteEntryFileName,
+  resolveSsrRemoteEntryFileName,
+} from "./federation-paths";
+import { isJsonObject, parseJsonObject } from "./json";
 import type { ModuleOptions } from "./options";
 
 type NitroPublicAssetsContext = {
@@ -32,7 +38,10 @@ export function registerRemoteEntryAssetCopy(
   options: ModuleOptions,
 ) {
   const outputBase = publicBase.replace(/^\//, "");
-  const remoteEntryFiles = resolveRemoteEntryFiles(options);
+  const remoteEntryFile = resolveRemoteEntryFileName(options);
+  const ssrRemoteEntryFile = resolveSsrRemoteEntryFileName(remoteEntryFile);
+  const manifestFile = resolveManifestFileName(options);
+  const remoteEntryFiles = [remoteEntryFile, ssrRemoteEntryFile, manifestFile];
 
   // Nuxt only copies the _nuxt/ subfolder from dist/client/ to .output/public/.
   // Federation entries are moved under publicBase, so their root-relative chunk
@@ -45,7 +54,18 @@ export function registerRemoteEntryAssetCopy(
       if (existsSync(src)) {
         ensureParentDir(dest);
 
-        if (shouldRebaseNuxtClientImports(file, outputBase)) {
+        if (file === manifestFile) {
+          writeFileSync(
+            dest,
+            rebaseFederationManifest(
+              readFileSync(src, "utf8"),
+              outputBase,
+              manifestFile,
+              remoteEntryFile,
+              ssrRemoteEntryFile,
+            ),
+          );
+        } else if (shouldRebaseNuxtClientImports(file, outputBase)) {
           writeFileSync(
             dest,
             rebaseNuxtClientImports(
@@ -60,41 +80,6 @@ export function registerRemoteEntryAssetCopy(
       }
     }
   });
-}
-
-function resolveRemoteEntryFiles(options: ModuleOptions) {
-  const remoteEntry = resolveRemoteEntryFileName(options);
-
-  return [
-    remoteEntry,
-    resolveSsrRemoteEntryFileName(remoteEntry),
-    resolveManifestFileName(options),
-  ];
-}
-
-function resolveRemoteEntryFileName(options: ModuleOptions) {
-  return typeof options.config?.filename === "string"
-    ? options.config.filename
-    : "remoteEntry.js";
-}
-
-function resolveSsrRemoteEntryFileName(remoteEntry: string) {
-  const dotIndex = remoteEntry.lastIndexOf(".");
-
-  if (dotIndex === -1) return `${remoteEntry}.ssr.js`;
-
-  return `${remoteEntry.slice(0, dotIndex)}.ssr${remoteEntry.slice(dotIndex)}`;
-}
-
-function resolveManifestFileName(options: ModuleOptions) {
-  if (
-    options.config?.manifest &&
-    typeof options.config.manifest !== "boolean"
-  ) {
-    return options.config.manifest.fileName || "mf-manifest.json";
-  }
-
-  return "mf-manifest.json";
 }
 
 function ensureParentDir(path: string) {
@@ -118,4 +103,123 @@ function rebaseNuxtClientImports(
   const prefix = "../".repeat(depth);
 
   return source.replace(/(["'`])\.\/_nuxt\//g, `$1${prefix}_nuxt/`);
+}
+
+function rebaseFederationManifest(
+  source: string,
+  outputBase: string,
+  manifestFile: string,
+  remoteEntryFile: string,
+  ssrRemoteEntryFile: string,
+) {
+  const manifest = parseJsonObject(source);
+  if (!manifest) return source;
+
+  const metaData = isJsonObject(manifest.metaData) ? manifest.metaData : {};
+  manifest.metaData = metaData;
+
+  rebaseManifestEntry(
+    metaData.remoteEntry,
+    outputBase,
+    manifestFile,
+    remoteEntryFile,
+  );
+  rebaseManifestEntry(
+    metaData.ssrRemoteEntry,
+    outputBase,
+    manifestFile,
+    ssrRemoteEntryFile,
+  );
+
+  if (shouldUseAutoPublicPath(metaData.publicPath)) {
+    metaData.publicPath = "auto";
+  }
+
+  const publicRootPrefix = resolveRelativeUrl(
+    manifestPublicDir(outputBase, manifestFile),
+    "",
+  );
+
+  for (const expose of getManifestExposeEntries(manifest)) {
+    rebaseManifestAssetGroup(expose.assets, publicRootPrefix);
+  }
+
+  return JSON.stringify(manifest);
+}
+
+function rebaseManifestEntry(
+  entry: unknown,
+  outputBase: string,
+  manifestFile: string,
+  entryFile: string,
+) {
+  if (!isJsonObject(entry)) return;
+
+  entry.name = posix.basename(entryFile);
+  entry.path = resolveRelativeUrl(
+    manifestPublicDir(outputBase, manifestFile),
+    publicFileDir(outputBase, entryFile),
+  );
+}
+
+function getManifestExposeEntries(manifest: Record<string, unknown>) {
+  return Array.isArray(manifest.exposes)
+    ? manifest.exposes.filter(isJsonObject)
+    : [];
+}
+
+function rebaseManifestAssetGroup(assets: unknown, publicRootPrefix: string) {
+  if (!isJsonObject(assets)) return;
+
+  for (const type of ["js", "css"]) {
+    const group = assets[type];
+    if (!isJsonObject(group)) continue;
+
+    for (const loadType of ["sync", "async"]) {
+      const assetList = group[loadType];
+      if (!Array.isArray(assetList)) continue;
+
+      group[loadType] = assetList.map((asset) =>
+        typeof asset === "string" && isNuxtAsset(asset)
+          ? `${publicRootPrefix}${stripRelativePrefix(asset)}`
+          : asset,
+      );
+    }
+  }
+}
+
+function shouldUseAutoPublicPath(publicPath: unknown) {
+  return (
+    typeof publicPath === "string" &&
+    (publicPath === "" || publicPath === "." || publicPath.startsWith("./"))
+  );
+}
+
+function isNuxtAsset(asset: string) {
+  const normalized = stripRelativePrefix(asset);
+  return normalized.startsWith("_nuxt/");
+}
+
+function stripRelativePrefix(value: string) {
+  return value.replace(/^\.\/+/, "");
+}
+
+function manifestPublicDir(outputBase: string, manifestFile: string) {
+  return publicFileDir(outputBase, manifestFile);
+}
+
+function publicFileDir(outputBase: string, file: string) {
+  return normalizePublicPath(posix.dirname(posix.join(outputBase, file)));
+}
+
+function resolveRelativeUrl(fromDir: string, toPath: string) {
+  const normalizedTo = normalizePublicPath(toPath);
+  const relative = posix.relative(fromDir, normalizedTo);
+
+  if (!relative) return "";
+  return relative.endsWith("/") ? relative : `${relative}/`;
+}
+
+function normalizePublicPath(path: string) {
+  return path === "." ? "" : path.replace(/^\/+/, "");
 }

@@ -2,6 +2,7 @@ import { federation } from "@module-federation/vite";
 import { addVitePlugin } from "@nuxt/kit";
 import { createRequire } from "node:module";
 import { resolve } from "node:path";
+import { getStatsFileName, resolveManifestFileName } from "./federation-paths";
 import { isJsonObject, parseJsonObject } from "./json";
 import type { ModuleOptions } from "./options";
 
@@ -322,25 +323,4 @@ function resolveManifestMetadata(options: ModuleOptions) {
       owner: process.env.MF_OWNER,
     }).filter(([, value]) => Boolean(value)),
   );
-}
-
-function resolveManifestFileName(options: ModuleOptions) {
-  if (
-    options.config?.manifest &&
-    typeof options.config.manifest !== "boolean"
-  ) {
-    return options.config.manifest.fileName || "mf-manifest.json";
-  }
-
-  return "mf-manifest.json";
-}
-
-function getStatsFileName(manifestFileName: string) {
-  const dotIndex = manifestFileName.lastIndexOf(".");
-  const ext = dotIndex === -1 ? ".json" : manifestFileName.slice(dotIndex);
-  const withoutExt =
-    dotIndex === -1 ? manifestFileName : manifestFileName.slice(0, dotIndex);
-  const baseName = withoutExt === "mf-manifest" ? "mf" : withoutExt;
-
-  return `${baseName}-stats${ext}`;
 }
