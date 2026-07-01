@@ -27,10 +27,12 @@ export async function resolveRemoteComponents(options: {
         options.remotes?.[remoteName],
         options.manifestFetchTimeoutMs,
       );
-      const exposedNames =
-        manifestComponents.length > 0
-          ? manifestComponents
-          : normalizeComponentExposes(options.configured?.[remoteName] || []);
+      const configuredComponents = normalizeComponentExposes(
+        options.configured?.[remoteName] || [],
+      );
+      const exposedNames = [
+        ...new Set([...configuredComponents, ...manifestComponents]),
+      ];
 
       return exposedNames.map((exposedName) =>
         createRemoteComponent(remoteName, exposedName, remoteNames.length),
