@@ -3,11 +3,6 @@ import type { ModuleFederationOptions } from "@module-federation/vite";
 export const DEFAULT_BASE = "/_mf";
 export const DEFAULT_EXPOSED_DIR = "~/components/exposed";
 export const DEFAULT_MANIFEST_FETCH_TIMEOUT_MS = 500;
-export const REMOTE_ENTRY_ASSETS = [
-  "remoteEntry.js",
-  "remoteEntry.ssr.js",
-  "mf-manifest.json",
-] as const;
 
 export interface ModuleOptions {
   base?: string;
@@ -29,5 +24,5 @@ export const defaultModuleOptions = {
 } satisfies ModuleOptions;
 
 export function normalizeBase(base = DEFAULT_BASE) {
-  return base.replace(/^\/?/, "/");
+  return `/${base}`.replace(/\/+/g, "/").replace(/\/$/, "") || "/";
 }
