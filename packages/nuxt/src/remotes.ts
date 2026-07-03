@@ -13,20 +13,33 @@ export interface RemoteComponent {
   remoteName: string;
 }
 
+export interface RemoteSharedInfo {
+  name: string;
+  version?: string;
+  requiredVersion?: string;
+}
+
 export async function resolveRemoteComponents(options: {
   configured?: Record<string, string[]>;
   manifestFetchTimeoutMs?: number;
   remotes?: ModuleFederationOptions["remotes"];
 }) {
   const remoteNames = Object.keys(options.remotes || {});
-  if (remoteNames.length === 0) return [];
+  const remoteShared: Record<string, RemoteSharedInfo[]> = {};
+  if (remoteNames.length === 0) return { components: [], remoteShared };
 
   const components = await Promise.all(
     remoteNames.map(async (remoteName) => {
-      const manifestComponents = await fetchRemoteManifestComponents(
+      const manifest = await fetchRemoteManifest(
         options.remotes?.[remoteName],
         options.manifestFetchTimeoutMs,
       );
+      remoteShared[remoteName] = manifest ? readManifestShared(manifest) : [];
+      const manifestComponents = manifest
+        ? readManifestExposes(manifest)
+            .map((expose) => normalizeExposeName(expose))
+            .filter(isValidComponentExpose)
+        : [];
       const configuredComponents = normalizeComponentExposes(
         options.configured?.[remoteName] || [],
       );
@@ -40,7 +53,7 @@ export async function resolveRemoteComponents(options: {
     }),
   );
 
-  return components.flat();
+  return { components: components.flat(), remoteShared };
 }
 
 export function registerRemoteComponents(
@@ -68,12 +81,29 @@ export function registerRemoteComponents(
           },
         });
 
+        const ssrFallback = defineComponent({
+          name: "RemoteSsrFallback",
+          setup: () => () => null,
+        });
+
+        const loadRemote = (importPath, load) =>
+          load().catch((error) => {
+            if (typeof window !== "undefined") throw error;
+
+            console.warn(
+              "[module-federation] Failed to load " + importPath + " during SSR;" +
+              " rendering nothing on the server. The client will render it after hydration.",
+              error,
+            );
+            return ssrFallback;
+          });
+
         ${components
           .map((component) =>
             renderOnServer
               ? `
                   export const ${component.exportName} = defineAsyncComponent({
-                    loader: () => import("${component.importPath}").then((m) => m.default || m),
+                    loader: () => loadRemote("${component.importPath}", () => import("${component.importPath}").then((m) => m.default || m)),
                     suspensible: true,
                   });
                 `
@@ -154,27 +184,43 @@ function createRemoteComponent(
   };
 }
 
-async function fetchRemoteManifestComponents(
+async function fetchRemoteManifest(
   remote: RemoteConfig | undefined,
   timeoutMs = DEFAULT_MANIFEST_FETCH_TIMEOUT_MS,
 ) {
   const manifestUrl = resolveManifestUrl(remote);
-  if (!manifestUrl) return [];
+  if (!manifestUrl) return;
 
   try {
     const response = await fetchWithTimeout(manifestUrl, timeoutMs);
-    if (!response.ok) return [];
+    if (!response.ok) return;
 
-    const manifestText = await response.text();
-    const manifest = parseJsonObject(manifestText);
-    if (!manifest) return [];
-
-    return readManifestExposes(manifest)
-      .map((expose) => normalizeExposeName(expose))
-      .filter(isValidComponentExpose);
+    return parseJsonObject(await response.text()) || undefined;
   } catch {
-    return [];
+    return;
   }
+}
+
+function readManifestShared(
+  manifest: Record<string, unknown>,
+): RemoteSharedInfo[] {
+  const shared = manifest.shared;
+  if (!Array.isArray(shared)) return [];
+
+  return shared.flatMap((entry) => {
+    if (!isJsonObject(entry)) return [];
+
+    const name = readString(entry, "name");
+    if (!name) return [];
+
+    return [
+      {
+        name,
+        version: readString(entry, "version"),
+        requiredVersion: readString(entry, "requiredVersion"),
+      },
+    ];
+  });
 }
 
 async function fetchWithTimeout(url: string, timeoutMs: number) {

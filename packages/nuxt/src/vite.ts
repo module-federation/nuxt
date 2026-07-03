@@ -5,6 +5,7 @@ import { resolve } from "node:path";
 import { getStatsFileName, resolveManifestFileName } from "./federation-paths";
 import { isJsonObject, parseJsonObject } from "./json";
 import type { ModuleOptions } from "./options";
+import { getSharedPackageNames } from "./shared";
 
 const NUXT_SSR_ESM_EXTERNALS = ["vue", "vue-router"];
 const COMMON_SSR_SHARED_PACKAGES = [
@@ -12,8 +13,17 @@ const COMMON_SSR_SHARED_PACKAGES = [
   "@module-federation/runtime-core",
   "@module-federation/sdk",
 ];
+const SHARED_STRATEGY_PLUGIN = "@module-federation/nuxt/shared-strategy";
+const SSR_ENTRY_LOADER_PLUGIN = "@module-federation/vite/ssrEntryLoader";
 type FederationConfig = NonNullable<ModuleOptions["config"]>;
-type SharedConfig = FederationConfig["shared"];
+type RuntimePluginEntry = NonNullable<
+  FederationConfig["runtimePlugins"]
+>[number];
+
+interface SsrPatchContext {
+  enableServerFederation: boolean;
+  resolvedShared: Record<string, string>;
+}
 
 export function registerFederationPlugin(
   options: ModuleOptions,
@@ -24,11 +34,16 @@ export function registerFederationPlugin(
   const enableServerFederation = ssrOptions.server !== false;
   const ssrShared = resolveSsrShared(options, rootDir);
 
+  // Mirror the Modern.js plugin: one user config, cloned and patched per
+  // target so the client (csr) and server (ssr) builds stay in sync. The
+  // configs must be created lazily (inside the plugin factories) because
+  // `exposed` is only populated once the components hooks have run.
   addVitePlugin(
-    () => federation(createFederationConfig(options, exposed, rootDir)),
-    {
-      server: false,
-    },
+    () =>
+      federation(
+        patchMFConfig(createFederationConfig(options, exposed, rootDir), false),
+      ),
+    { server: false },
   );
 
   registerServerCommonJsInteropPlugin(ssrShared.esmExternals);
@@ -36,32 +51,64 @@ export function registerFederationPlugin(
   addVitePlugin(
     () =>
       federation(
-        createFederationConfig(
-          {
-            ...options,
-            config: enableServerFederation
-              ? withSsrEntryLoader(
-                  {
-                    ...options.config,
-                    shared: {},
-                    target: "node",
-                  },
-                  ssrShared.resolvedShared,
-                )
-              : {
-                  ...options.config,
-                  shared: {},
-                  target: "node",
-                },
-          },
-          exposed,
-          rootDir,
+        patchMFConfig(
+          createFederationConfig(
+            {
+              ...options,
+              config: { ...options.config, shared: {}, target: "node" },
+            },
+            exposed,
+            rootDir,
+          ),
+          true,
+          { enableServerFederation, resolvedShared: ssrShared.resolvedShared },
         ),
       ),
     { client: false },
   );
 
   registerManifestMetadataPlugin(options);
+}
+
+function patchMFConfig(
+  config: ReturnType<typeof createFederationConfig>,
+  isServer: boolean,
+  ssrContext?: SsrPatchContext,
+) {
+  const runtimePlugins: RuntimePluginEntry[] = [
+    ...(config.runtimePlugins || []),
+  ];
+
+  injectRuntimePlugin(runtimePlugins, SHARED_STRATEGY_PLUGIN);
+
+  if (isServer && ssrContext?.enableServerFederation && hasRemotes(config)) {
+    injectRuntimePlugin(runtimePlugins, [
+      SSR_ENTRY_LOADER_PLUGIN,
+      { resolvedShared: ssrContext.resolvedShared },
+    ]);
+  }
+
+  return { ...config, runtimePlugins };
+}
+
+function injectRuntimePlugin(
+  runtimePlugins: RuntimePluginEntry[],
+  plugin: RuntimePluginEntry,
+) {
+  const specifier = runtimePluginSpecifier(plugin);
+  const hasPlugin = runtimePlugins.some(
+    (existing) => runtimePluginSpecifier(existing) === specifier,
+  );
+
+  if (!hasPlugin) runtimePlugins.push(plugin);
+}
+
+function runtimePluginSpecifier(plugin: RuntimePluginEntry) {
+  return typeof plugin === "string" ? plugin : plugin[0];
+}
+
+function hasRemotes(config: FederationConfig) {
+  return Boolean(config.remotes && Object.keys(config.remotes).length > 0);
 }
 
 function createFederationConfig(
@@ -116,35 +163,6 @@ function normalizeExposeImportPath(importPath: string, rootDir: string) {
   return resolve(rootDir, importPath);
 }
 
-function withSsrEntryLoader(
-  config: ModuleOptions["config"],
-  resolvedShared: Record<string, string>,
-) {
-  if (!config?.remotes || Object.keys(config.remotes).length === 0) {
-    return config;
-  }
-
-  const ssrEntryLoader = "@module-federation/vite/ssrEntryLoader";
-  const runtimePlugins = config.runtimePlugins || [];
-  const hasSsrEntryLoader = runtimePlugins.some(
-    (plugin) =>
-      (typeof plugin === "string" ? plugin : plugin[0]) === ssrEntryLoader,
-  );
-
-  if (hasSsrEntryLoader) return config;
-
-  return {
-    ...config,
-    runtimePlugins: [
-      ...runtimePlugins,
-      [ssrEntryLoader, { resolvedShared }] satisfies [
-        string,
-        Record<string, unknown>,
-      ],
-    ],
-  };
-}
-
 function resolveSsrShared(options: ModuleOptions, rootDir: string) {
   const sharedPackages = getSharedPackageNames(options.config?.shared);
   const esmExternals = NUXT_SSR_ESM_EXTERNALS.filter((packageName) =>
@@ -191,13 +209,6 @@ function resolvePackage(
       return;
     }
   }
-}
-
-function getSharedPackageNames(shared: SharedConfig | undefined) {
-  if (Array.isArray(shared)) return new Set(shared);
-  if (isJsonObject(shared)) return new Set(Object.keys(shared));
-
-  return new Set<string>();
 }
 
 function registerServerCommonJsInteropPlugin(esmExternals: string[]) {
