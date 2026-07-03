@@ -18,6 +18,7 @@ export default defineConfig({
   dts: true,
   entry: {
     federation: "./federation.ts",
+    "shared-strategy": "./src/runtime/shared-strategy.ts",
   },
   format: ["esm"],
   outDir: "dist",

@@ -92,7 +92,10 @@ function getFederationAssetRoutes(publicBase: string, assetFiles: string[]) {
     return assetFiles.map(normalizePath);
   }
 
-  return [`${routeBase}/**`];
+  // The remote entry is also copied to the public root (see
+  // copyOriginalRemoteEntryAsset) and the rebased manifest points browsers
+  // there, so the root-level copies need CORS headers too.
+  return [`${routeBase}/**`, ...assetFiles.map(normalizePath)];
 }
 
 function normalizePath(path: string) {
