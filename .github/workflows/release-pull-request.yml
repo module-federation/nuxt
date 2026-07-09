@@ -1,0 +1,65 @@
+name: Release Pull Request
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        type: choice
+        description: Release Type (next, beta, alpha, latest)
+        required: true
+        default: latest
+        options:
+          - next
+          - beta
+          - alpha
+          - latest
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release:
+    name: Create Release Pull Request
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 10
+
+      - name: Cache tool downloads
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache
+          key: ${{ runner.os }}-toolcache-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-toolcache-
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.0.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Create release pull request
+        uses: module-federation/actions@v2
+        with:
+          version: ${{ github.event.inputs.version || 'latest' }}
+          versionNumber: auto
+          type: pull request
+          tools: changeset
+          coreNpmName: "@module-federation/nuxt"
+        env:
+          GITHUB_TOKEN: ${{ secrets.REPO_SCOPED_TOKEN || secrets.GITHUB_TOKEN }}
+          REPOSITORY: ${{ github.repository }}
+          REF: ${{ github.ref }}
