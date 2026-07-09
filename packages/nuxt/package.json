@@ -1,6 +1,6 @@
 {
   "name": "@module-federation/nuxt",
-  "version": "0.0.1-alpha.0",
+  "version": "0.0.1",
   "type": "module",
   "description": "Nuxt module for Module Federation using @module-federation/vite",
   "main": "./dist/federation.mjs",
