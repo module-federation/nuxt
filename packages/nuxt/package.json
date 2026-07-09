@@ -2,20 +2,24 @@
   "name": "@module-federation/nuxt",
   "version": "0.0.1-alpha.0",
   "type": "module",
-  "scripts": {
-    "build": "tsdown",
-    "dev": "tsdown --watch",
-    "pack:dry": "npm pack --dry-run",
-    "prepack": "pnpm run build",
-    "prepublishOnly": "pnpm run typecheck && pnpm run build",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
-  },
-  "files": [
-    "dist"
-  ],
+  "description": "Nuxt module for Module Federation using @module-federation/vite",
   "main": "./dist/federation.mjs",
   "module": "./dist/federation.mjs",
   "types": "./dist/federation.d.mts",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/module-federation/nuxt",
+    "directory": "packages/nuxt"
+  },
+  "bugs": {
+    "url": "https://github.com/module-federation/nuxt/issues"
+  },
+  "homepage": "https://github.com/module-federation/nuxt#readme",
+  "keywords": [
+    "nuxt",
+    "module federation",
+    "microfrontend"
+  ],
   "exports": {
     ".": {
       "types": "./dist/federation.d.mts",
@@ -24,9 +28,21 @@
     },
     "./package.json": "./package.json"
   },
+  "files": [
+    "dist/**/*",
+    "README.md"
+  ],
   "publishConfig": {
     "access": "public",
     "provenance": true
+  },
+  "scripts": {
+    "build": "tsdown",
+    "dev": "tsdown --watch",
+    "pack:dry": "npm pack --dry-run",
+    "prepack": "pnpm run build",
+    "prepublishOnly": "pnpm run typecheck && pnpm run build",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "engines": {
     "node": "^22.12.0 || ^24.11.0 || >=26.0.0"
