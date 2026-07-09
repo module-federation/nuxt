@@ -26,6 +26,11 @@
       "import": "./dist/federation.mjs",
       "default": "./dist/federation.mjs"
     },
+    "./shared-strategy": {
+      "types": "./dist/shared-strategy.d.mts",
+      "import": "./dist/shared-strategy.mjs",
+      "default": "./dist/shared-strategy.mjs"
+    },
     "./package.json": "./package.json"
   },
   "files": [
