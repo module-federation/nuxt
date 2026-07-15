@@ -1,8 +1,8 @@
-name: Publish (GitHub Release)
+name: Release
 
 on:
   release:
-    types: [released, prereleased]
+    types: [published]
   workflow_dispatch:
     inputs:
       version:
@@ -31,14 +31,34 @@ jobs:
     runs-on: ubuntu-latest
     environment: Publish
     steps:
+      - name: Validate manual publish target
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          RELEASE_BRANCH: ${{ github.event.inputs.branch }}
+        run: |
+          if [ "$RELEASE_BRANCH" != "main" ]; then
+            echo "Releases must publish from main."
+            echo "Got: $RELEASE_BRANCH"
+            exit 1
+          fi
+
       - name: Checkout source
-        uses: actions/checkout@v5
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
-          fetch-depth: 25
+          fetch-depth: 0
           ref: ${{ github.event.release.tag_name || github.event.inputs.branch }}
 
+      - name: Verify source is on main
+        run: |
+          git fetch --no-tags origin main:refs/remotes/origin/main
+          if ! git merge-base --is-ancestor HEAD origin/main; then
+            echo "Release source must be reachable from main."
+            echo "Got: $(git rev-parse HEAD)"
+            exit 1
+          fi
+
       - name: Cache tool downloads
-        uses: actions/cache@v4
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: ~/.cache
           key: ${{ runner.os }}-toolcache-${{ hashFiles('pnpm-lock.yaml') }}
@@ -46,18 +66,16 @@ jobs:
             ${{ runner.os }}-toolcache-
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@b0f76dfb45f55f8421693e4803ac7bb65143bd34 # v6
         with:
           version: 9.0.0
 
       - name: Setup Node
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: 24
           cache: pnpm
           registry-url: https://registry.npmjs.org/
-
-      - run: corepack enable
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -65,13 +83,19 @@ jobs:
       - name: Generate preview version
         if: github.event_name == 'workflow_dispatch' && github.event.inputs.version == 'next'
         run: |
-          SAFE_BRANCH=$(echo "${{ github.event.inputs.branch }}" | sed 's/[^a-zA-Z0-9-]/-/g' | tr '[:upper:]' '[:lower:]')
-          pnpm changeset version --snapshot "$SAFE_BRANCH"
+          pnpm changeset version --snapshot next
+          SNAPSHOT_VERSION="$(node -p "require('./packages/nuxt/package.json').version")"
+          BASE_VERSION="${SNAPSHOT_VERSION%%-*}"
+          NEXT_VERSION="${BASE_VERSION}-next.${GITHUB_RUN_ID}"
+          npm pkg set version="$NEXT_VERSION" --prefix packages/nuxt
+          echo "Set preview version: $NEXT_VERSION"
 
       - name: Verify tag matches package version
         if: github.event_name == 'release'
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
         run: |
-          TAG="${{ github.event.release.tag_name }}"
+          TAG="$RELEASE_TAG"
           if [ "${TAG#v}" != "$TAG" ]; then
             echo "Invalid tag format; refusing to publish."
             echo "Expected: 1.2.3 (no leading 'v')"
@@ -89,45 +113,51 @@ jobs:
             exit 1
           fi
 
-      - name: Patch prerelease version with next tag
-        if: github.event_name == 'release' && github.event.action == 'prereleased'
+      - name: Set deterministic prerelease version
+        if: github.event_name == 'release' && github.event.release.prerelease
         shell: bash
         run: |
-          PACKAGE_NAME="@module-federation/nuxt"
           CURRENT_VERSION="$(node -p "require('./packages/nuxt/package.json').version")"
           BASE_VERSION="${CURRENT_VERSION%%-*}"
-          CURRENT_NEXT="$(npm view "$PACKAGE_NAME" "dist-tags.next" --json 2>/dev/null || true)"
-          CURRENT_NEXT="${CURRENT_NEXT#\"}"
-          CURRENT_NEXT="${CURRENT_NEXT%\"}"
-          if [ "$CURRENT_NEXT" = "null" ]; then
-            CURRENT_NEXT=""
-          fi
-
-          PREFIX_REGEX="^${BASE_VERSION//./\\.}-next\.([0-9]+)$"
-          if [[ "$CURRENT_NEXT" =~ $PREFIX_REGEX ]]; then
-            NEXT_NUMBER=$((BASH_REMATCH[1] + 1))
-          else
-            NEXT_NUMBER=1
-          fi
-
-          NEXT_VERSION="${BASE_VERSION}-next.${NEXT_NUMBER}"
+          NEXT_VERSION="${BASE_VERSION}-next.${GITHUB_RUN_ID}"
           npm pkg set version="$NEXT_VERSION" --prefix packages/nuxt
           echo "Set prerelease version: $NEXT_VERSION"
 
-      - name: Build package
-        run: pnpm build:package
+      - name: Typecheck workspace
+        run: pnpm typecheck
+
+      - name: Build package and examples
+        run: pnpm build
+
+      - name: Test package and production examples
+        run: pnpm test
+
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Test browser hydration
+        run: pnpm test:e2e
+
+      - name: Check formatting
+        run: pnpm format:check
+
+      - name: Verify published package contents
+        run: pnpm pack:nuxt
 
       - name: Compute npm dist-tag
         id: dist
         shell: bash
+        env:
+          IS_PRERELEASE: ${{ github.event.release.prerelease || false }}
+          RELEASE_VERSION: ${{ github.event.inputs.version }}
         run: |
           DIST_TAG="latest"
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            if [ "${{ github.event.inputs.version }}" = "next" ]; then
+            if [ "$RELEASE_VERSION" = "next" ]; then
               DIST_TAG="next"
             fi
           else
-            if [ "${{ github.event.action }}" = "prereleased" ]; then
+            if [ "$IS_PRERELEASE" = "true" ]; then
               DIST_TAG="next"
             fi
           fi
@@ -189,9 +219,10 @@ jobs:
       - name: Post summary
         if: always()
         continue-on-error: true
+        env:
+          SOURCE_REF: ${{ github.event.release.tag_name || github.event.inputs.branch }}
         run: |
           PKG_VERSION="$(node -p "require('./packages/nuxt/package.json').version")"
-          SOURCE_REF="${{ github.event.release.tag_name || github.event.inputs.branch }}"
           echo "## npm publish" > "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "Package: \`@module-federation/nuxt\`" >> "$GITHUB_STEP_SUMMARY"

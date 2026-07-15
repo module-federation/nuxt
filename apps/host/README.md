@@ -1,75 +1,52 @@
-# Nuxt Minimal Starter
+# Nuxt Module Federation host example
 
-Look at the [Nuxt documentation](https://nuxt.com/docs/getting-started/introduction) to learn more.
+This Nuxt application consumes the `remote` application and demonstrates both local and federated server-rendered Vue components.
 
-## Setup
+- Host: `http://localhost:4173`
+- Remote dependency: `http://localhost:4174`
+- Configuration: [`nuxt.config.ts`](nuxt.config.ts)
+- App shell: [`app/app.vue`](app/app.vue)
+- Page composition: [`app/pages/index.vue`](app/pages/index.vue)
 
-Make sure to install dependencies:
+## Run both applications
+
+From the repository root:
 
 ```bash
-# npm
-npm install
-
-# pnpm
 pnpm install
-
-# yarn
-yarn install
-
-# bun
-bun install
-```
-
-## Development Server
-
-Start the development server on `http://localhost:3000`:
-
-```bash
-# npm
-npm run dev
-
-# pnpm
 pnpm dev
-
-# yarn
-yarn dev
-
-# bun
-bun run dev
 ```
 
-## Production
+Open `http://localhost:4173`. The page should contain the host card, host SSR card, remote widget, and remote counter.
 
-Build the application for production:
+To run only the host:
 
 ```bash
-# npm
-npm run build
+pnpm dev:host
+```
 
-# pnpm
+The remote must already be reachable on port `4174` for manifest discovery and remote rendering.
+
+## Federation wiring
+
+`nuxt.config.ts`:
+
+- registers `@module-federation/nuxt`;
+- maps the MF remote name `remote` to `http://localhost:4174/_mf/mf-manifest.json`;
+- lists `Counter` and `Widget` in `remoteComponents`, keeping registration deterministic if the remote manifest is unavailable during setup;
+- exposes the components as `<RemoteCounter />` and `<RemoteWidget />` through Nuxt auto-imports.
+
+## SSR behavior
+
+The repository currently runs Nuxt development with Vite 7. Remote components therefore render client-only during `pnpm dev`; the module logs the Vite 8 development-SSR requirement.
+
+Production builds render the remote components on the server. Verify that path from the repository root:
+
+```bash
 pnpm build
-
-# yarn
-yarn build
-
-# bun
-bun run build
-```
-
-Locally preview production build:
-
-```bash
-# npm
-npm run preview
-
-# pnpm
 pnpm preview
-
-# yarn
-yarn preview
-
-# bun
-bun run preview
 ```
 
-Check out the [deployment documentation](https://nuxt.com/docs/getting-started/deployment) for more information.
+View the HTML source at `http://localhost:4173` and confirm it contains `I'm the remote app` and `Remote SSR component` before hydration. Then confirm both remote counters remain interactive in the browser.
+
+The preview ports are fixed. Stop any existing process on `4173` or `4174` before starting the examples.

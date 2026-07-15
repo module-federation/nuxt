@@ -1,75 +1,57 @@
-# Nuxt Minimal Starter
+# Nuxt Module Federation remote example
 
-Look at the [Nuxt documentation](https://nuxt.com/docs/getting-started/introduction) to learn more.
+This Nuxt application provides Vue components to the host example and runs standalone at `http://localhost:4174`.
 
-## Setup
+- Remote: `http://localhost:4174`
+- Host consumer: `http://localhost:4173`
+- Configuration: [`nuxt.config.ts`](nuxt.config.ts)
+- Exposed components: [`app/components/exposed`](app/components/exposed)
 
-Make sure to install dependencies:
+## Run
+
+Start both examples from the repository root:
 
 ```bash
-# npm
-npm install
-
-# pnpm
 pnpm install
-
-# yarn
-yarn install
-
-# bun
-bun install
-```
-
-## Development Server
-
-Start the development server on `http://localhost:3000`:
-
-```bash
-# npm
-npm run dev
-
-# pnpm
 pnpm dev
-
-# yarn
-yarn dev
-
-# bun
-bun run dev
 ```
 
-## Production
-
-Build the application for production:
+Or run only the remote:
 
 ```bash
-# npm
-npm run build
+pnpm dev:remote
+```
 
-# pnpm
+The port is fixed because the host configuration points to `4174`.
+
+## Federation wiring
+
+`@module-federation/nuxt` automatically exposes components under `app/components/exposed`:
+
+- `Counter.vue` as `./Counter`
+- `Widget.vue` as `./Widget`
+
+The explicit `config.exposes` entry also publishes `app/app.vue` as `./remote-app`. It demonstrates how to expose files outside the convention directory.
+
+To add another auto-registered component, create `app/components/exposed/Example.vue`. After restarting the applications, a single-remote host can render it as `<RemoteExample />`.
+
+## Federation assets
+
+Development and production serve the federation contract under `/_mf`:
+
+- `http://localhost:4174/_mf/mf-manifest.json`
+- `http://localhost:4174/_mf/remoteEntry.js`
+- `http://localhost:4174/_mf/remoteEntry.ssr.js`
+
+The manifest points browser assets back to the application's configured `app.buildAssetsDir` (`/_nuxt` by default). The module also serves a compatibility copy of the browser entry at `/remoteEntry.js` and adds CORS headers to federation assets.
+
+## Production verification
+
+From the repository root:
+
+```bash
 pnpm build
-
-# yarn
-yarn build
-
-# bun
-bun run build
-```
-
-Locally preview production build:
-
-```bash
-# npm
-npm run preview
-
-# pnpm
 pnpm preview
-
-# yarn
-yarn preview
-
-# bun
-bun run preview
 ```
 
-Check out the [deployment documentation](https://nuxt.com/docs/getting-started/deployment) for more information.
+Verify all three `/_mf` URLs above return successfully, then open the host at `http://localhost:4173`. Its initial HTML should already include the remote component markup, and the remote counters should become interactive after hydration.

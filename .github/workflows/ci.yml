@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Verify (Node ${{ matrix.node-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version:
+          - "22.18.0"
+          - "24"
+          - "26"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@b0f76dfb45f55f8421693e4803ac7bb65143bd34 # v6
+        with:
+          version: 9.0.0
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: pnpm
+          registry-url: https://registry.npmjs.org/
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build package and examples
+        run: |
+          pnpm build:package
+          pnpm --filter nuxt-remote exec nuxt build
+          pnpm --filter nuxt-host exec nuxt build
+
+      - name: Test package and production examples
+        run: pnpm test
+
+      - name: Install Chromium
+        if: matrix.node-version == '24'
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Test browser hydration
+        if: matrix.node-version == '24'
+        run: pnpm test:e2e
+
+      - name: Typecheck workspace
+        run: pnpm typecheck
+
+      - name: Check formatting
+        run: pnpm format:check
+
+      - name: Verify published package contents
+        run: pnpm pack:nuxt

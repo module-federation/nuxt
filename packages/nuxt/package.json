@@ -3,12 +3,14 @@
   "version": "0.0.1",
   "type": "module",
   "description": "Nuxt module for Module Federation using @module-federation/vite",
+  "license": "MIT",
+  "sideEffects": false,
   "main": "./dist/federation.mjs",
   "module": "./dist/federation.mjs",
   "types": "./dist/federation.d.mts",
   "repository": {
     "type": "git",
-    "url": "https://github.com/module-federation/nuxt",
+    "url": "git+https://github.com/module-federation/nuxt.git",
     "directory": "packages/nuxt"
   },
   "bugs": {
@@ -31,11 +33,17 @@
       "import": "./dist/shared-strategy.mjs",
       "default": "./dist/shared-strategy.mjs"
     },
+    "./ssr-entry-loader": {
+      "types": "./dist/ssr-entry-loader.d.mts",
+      "import": "./dist/ssr-entry-loader.mjs",
+      "default": "./dist/ssr-entry-loader.mjs"
+    },
     "./package.json": "./package.json"
   },
   "files": [
     "dist/**/*",
-    "README.md"
+    "README.md",
+    "LICENSE"
   ],
   "publishConfig": {
     "access": "public",
@@ -50,10 +58,11 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "engines": {
-    "node": "^22.12.0 || ^24.11.0 || >=26.0.0"
+    "node": "^22.18.0 || ^24.11.0 || >=26.0.0"
   },
   "dependencies": {
-    "@module-federation/vite": "1.16.4",
+    "@module-federation/runtime": "2.7.0",
+    "@module-federation/vite": "1.18.0",
     "@nuxt/kit": "^4.4.8",
     "@nuxt/schema": "^4.4.8"
   },
@@ -63,7 +72,7 @@
   "devDependencies": {
     "@types/node": "24",
     "nuxt": "4.4.8",
-    "tsdown": "^0.21.0",
-    "vue-tsc": "3.2.2"
+    "tsdown": "^0.22.8",
+    "vue-tsc": "3.3.7"
   }
 }

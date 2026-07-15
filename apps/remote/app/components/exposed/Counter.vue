@@ -1,6 +1,17 @@
 <script setup lang="ts">
-const count = ref(0);
+import { defu } from "defu";
+import { inject, useSSRContext } from "vue";
+import { routerKey } from "vue-router";
+
+const counterDefaults = defu({ initialCount: 0 }, {});
+const count = ref(counterDefaults.initialCount);
 const hydrated = ref(false);
+const hostContext = inject<string>("module-federation:host-context", "missing");
+const hostRouter = inject(routerKey);
+const hasHostRouter =
+  typeof hostRouter?.resolve === "function" &&
+  hostRouter.resolve("/").href === "/";
+const hasSsrContext = import.meta.server ? Boolean(useSSRContext()) : true;
 
 onMounted(() => {
   hydrated.value = true;
@@ -31,6 +42,10 @@ onMounted(() => {
     >
       Rendered by remote before client hydration.
     </p>
+    <p v-if="hostContext === 'connected' && hasSsrContext">
+      Connected to the host Vue SSR context.
+    </p>
+    <p v-if="hasHostRouter">Connected to the host Vue Router context.</p>
     <button
       v-if="hydrated"
       style="
