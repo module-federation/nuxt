@@ -31,8 +31,6 @@ The port is fixed because the host configuration points to `4174`.
 - `Counter.vue` as `./Counter`
 - `Widget.vue` as `./Widget`
 
-The explicit `config.exposes` entry also publishes `app/app.vue` as `./remote-app`. It demonstrates how to expose files outside the convention directory.
-
 To add another auto-registered component, create `app/components/exposed/Example.vue`. After restarting the applications, a single-remote host can render it as `<RemoteExample />`.
 
 ## Federation assets
@@ -54,4 +52,4 @@ pnpm build
 pnpm preview
 ```
 
-Verify all three `/_mf` URLs above return successfully, then open the host at `http://localhost:4173`. Its initial HTML should already include the remote component markup, and the remote counters should become interactive after hydration.
+Verify all three `/_mf` URLs above return successfully, then open the host at `http://localhost:4173`. Its initial HTML should already include both remote components, and their counters should become interactive after hydration.

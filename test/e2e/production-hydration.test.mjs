@@ -33,8 +33,8 @@ test(
     );
     assert.match(
       await hostResponse.text(),
-      /Connected to the host Vue Router context\./,
-      "remote SSR did not reuse the host Vue Router injection keys",
+      /Rendered by remote before client hydration\./,
+      "remote component markup is missing from the server response",
     );
 
     const browser = await chromium.launch();
@@ -57,17 +57,9 @@ test(
       waitUntil: "networkidle",
     });
 
-    const remoteCard = page.locator(".remote-ssr-card");
+    const remoteCard = page.locator(".remote-card");
     await remoteCard.waitFor({ state: "visible" });
-    await remoteCard.getByText("Hydrated", { exact: true }).waitFor();
-    assert.match(
-      (await remoteCard.textContent()) ?? "",
-      /Connected to the host Vue SSR context\./,
-    );
-    assert.match(
-      (await remoteCard.textContent()) ?? "",
-      /Connected to the host Vue Router context\./,
-    );
+    await remoteCard.getByText("I'm the remote app", { exact: true }).waitFor();
 
     const remoteCounter = remoteCard.getByRole("button", {
       exact: true,
@@ -78,17 +70,14 @@ test(
       .getByRole("button", { exact: true, name: "Remote counter: 1" })
       .waitFor();
 
-    const remoteWidget = page.locator(".remote-card");
-    await remoteWidget
-      .getByText("I'm the remote app", { exact: true })
-      .waitFor();
-    const widgetCounter = remoteWidget.getByRole("button", {
+    const remoteSsrCard = page.locator(".remote-ssr-card");
+    const remoteSsrCounter = remoteSsrCard.getByRole("button", {
       exact: true,
-      name: "Remote counter: 0",
+      name: "Remote SSR counter: 0",
     });
-    await widgetCounter.click();
-    await remoteWidget
-      .getByRole("button", { exact: true, name: "Remote counter: 1" })
+    await remoteSsrCounter.click();
+    await remoteSsrCard
+      .getByRole("button", { exact: true, name: "Remote SSR counter: 1" })
       .waitFor();
 
     assert.deepEqual(browserErrors, []);

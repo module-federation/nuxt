@@ -233,7 +233,7 @@ test("SSR publisher rejects absolute build-machine imports", () => {
 test("SSR expose resolver bundles Rolldown absolute externals", async () => {
   const entryId = "virtual:mf-REMOTE_ENTRY_SSR_ID:test";
   const dependencyPath = createRequire(
-    resolve(repoRoot, "apps/remote/package.json"),
+    resolve(repoRoot, "package.json"),
   ).resolve("defu");
   const plugin = patchServerExposeResolver(
     {
@@ -282,10 +282,10 @@ test("SSR expose resolver trusts Rolldown's server-graph absolute external", asy
 test("SSR expose resolver seeds exposed modules before Rolldown resolves them", async () => {
   const exposedModule = resolve(
     repoRoot,
-    "apps/remote/app/components/exposed/Counter.vue",
+    "apps/remote/app/components/exposed/Widget.vue",
   );
   const dependencyPath = createRequire(
-    resolve(repoRoot, "apps/remote/package.json"),
+    resolve(repoRoot, "package.json"),
   ).resolve("defu");
   const plugin = patchServerExposeResolver(
     { name: "mf:ssr-remote-entry:pre" },

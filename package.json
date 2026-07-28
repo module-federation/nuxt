@@ -21,6 +21,7 @@
   "devDependencies": {
     "@changesets/cli": "^2.31.1",
     "@playwright/test": "1.62.0",
+    "defu": "6.1.7",
     "prettier": "^3.9.6",
     "turbo": "^2.10.7",
     "typescript": "6.0.3",

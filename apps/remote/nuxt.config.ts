@@ -13,8 +13,6 @@ export default defineNuxtConfig({
   devtools: { enabled: true },
   ssr: process.env.NUXT_MF_NUXT_SSR !== "false",
   experimental: {
-    // Tests opt into the shared Vite Environment API; normal builds retain
-    // coverage for Nuxt's legacy serial client/server path.
     viteEnvironmentApi: process.env.NUXT_MF_ENVIRONMENT_API === "true",
   },
   modules: ["@module-federation/nuxt"],
@@ -28,12 +26,10 @@ export default defineNuxtConfig({
   moduleFederation: {
     ssr: process.env.NUXT_MF_REMOTE_SSR !== "false",
     config: {
+      name: "remote",
       ...(process.env.NUXT_MF_FILENAME
         ? { filename: process.env.NUXT_MF_FILENAME }
         : {}),
-      exposes: {
-        "./remote-app": "./app/app.vue",
-      },
     },
   },
 });

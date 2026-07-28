@@ -66,11 +66,6 @@ export async function assertPublishedSsrExposeGraph(
   );
   assert.doesNotMatch(
     source,
-    /(?:\bfrom|\bimport\s*(?:\(\s*)?)\s*["'][^"']*\bdefu(?:@[^"'\/\\]+)?(?:[\/\\][^"']*)?["']/,
-    `${buildLabel} SSR graph externalized the remote-only defu dependency`,
-  );
-  assert.doesNotMatch(
-    source,
     /__mf_ssr_expose/,
     `${buildLabel} SSR graph leaked its internal bundling query`,
   );

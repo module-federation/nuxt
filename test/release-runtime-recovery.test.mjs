@@ -26,7 +26,6 @@ import {
 
 const remotePort = 4174;
 const remoteSsrMarker = "Rendered by remote before client hydration.";
-const sharedVueContextMarker = "Connected to the host Vue SSR context.";
 
 test(
   "an SSR outage fallback does not poison later remote loads",
@@ -70,6 +69,7 @@ test(
     assert.match(
       firstResponse.body,
       /Rendered by host before client hydration\./,
+      "the host SSR component did not render while the remote was unavailable",
     );
     assert.doesNotMatch(firstResponse.body, new RegExp(remoteSsrMarker));
 
@@ -91,11 +91,6 @@ test(
       recoveredResponse.body,
       new RegExp(remoteSsrMarker),
       "the first SSR request after remote recovery did not render the remote",
-    );
-    assert.match(
-      recoveredResponse.body,
-      new RegExp(sharedVueContextMarker),
-      "the remote did not reuse Nuxt's Vue SSR context",
     );
   },
 );

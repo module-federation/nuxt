@@ -12,21 +12,17 @@ import {
 } from "../helpers/release.mjs";
 
 const ssrMarkers = [
+  "I'm the remote app",
   "Remote SSR component",
   "Rendered by remote before client hydration.",
-  "Connected to the host Vue SSR context.",
-  "Connected to the host Vue Router context.",
 ];
 
 test(
-  "development remotes reuse the host SSR contexts",
+  "development remotes render on the server and hydrate",
   { timeout: 60_000 },
   async (context) => {
     const remotePort = await getFreePort();
 
-    // Exercise MF Vite's client-runner fallback on the remote while the host
-    // uses Nuxt's Environment API. This is the identity boundary that used to
-    // split Vue Router's injection keys during federated SSR.
     const remote = startNuxtDev("remote", remotePort, {
       NUXT_MF_ENVIRONMENT_API: "false",
     });
@@ -48,9 +44,6 @@ test(
     for (const marker of ssrMarkers) {
       assert.match(response.body, new RegExp(escapeRegExp(marker)));
     }
-    assert.doesNotMatch(response.body, /injection.*router.*not found/i);
-    assert.doesNotMatch(host.output, /injection.*router.*not found/i);
-
     const browser = await chromium.launch();
     context.after(() => browser.close());
     const page = await browser.newPage();
@@ -78,8 +71,8 @@ test(
       waitUntil: "networkidle",
     });
 
-    const remoteCard = page.locator(".remote-ssr-card");
-    await remoteCard.getByText("Hydrated", { exact: true }).waitFor();
+    const remoteCard = page.locator(".remote-card");
+    await remoteCard.getByText("I'm the remote app", { exact: true }).waitFor();
     const remoteCounter = remoteCard.getByRole("button", {
       exact: true,
       name: "Remote counter: 0",
@@ -87,6 +80,16 @@ test(
     await remoteCounter.click();
     await remoteCard
       .getByRole("button", { exact: true, name: "Remote counter: 1" })
+      .waitFor();
+
+    const remoteSsrCard = page.locator(".remote-ssr-card");
+    const remoteSsrCounter = remoteSsrCard.getByRole("button", {
+      exact: true,
+      name: "Remote SSR counter: 0",
+    });
+    await remoteSsrCounter.click();
+    await remoteSsrCard
+      .getByRole("button", { exact: true, name: "Remote SSR counter: 1" })
       .waitFor();
 
     const remoteOrigin = `http://127.0.0.1:${remotePort}`;

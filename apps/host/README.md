@@ -1,6 +1,6 @@
 # Nuxt Module Federation host example
 
-This Nuxt application consumes the `remote` application and demonstrates both local and federated server-rendered Vue components.
+This Nuxt application demonstrates local and federated server-rendered Vue components.
 
 - Host: `http://localhost:4173`
 - Remote dependency: `http://localhost:4174`
@@ -17,7 +17,7 @@ pnpm install
 pnpm dev
 ```
 
-Open `http://localhost:4173`. The page should contain the host card, host SSR card, remote widget, and remote counter.
+Open `http://localhost:4173`. The page should contain the host card, host SSR component, remote widget, and remote SSR component.
 
 To run only the host:
 
@@ -34,7 +34,18 @@ The remote must already be reachable on port `4174` for manifest discovery and r
 - registers `@module-federation/nuxt`;
 - maps the MF remote name `remote` to `http://localhost:4174/_mf/mf-manifest.json`;
 - lists `Counter` and `Widget` in `remoteComponents`, keeping registration deterministic if the remote manifest is unavailable during setup;
-- exposes the components as `<RemoteCounter />` and `<RemoteWidget />` through Nuxt auto-imports.
+- exposes them as `<RemoteCounter />` and `<RemoteWidget />` through Nuxt auto-imports.
+
+The page consumes it like any other Nuxt component:
+
+```vue
+<template>
+  <HostCard />
+  <HostSsrComponent />
+  <RemoteWidget />
+  <RemoteCounter />
+</template>
+```
 
 ## SSR behavior
 
@@ -47,6 +58,6 @@ pnpm build
 pnpm preview
 ```
 
-View the HTML source at `http://localhost:4173` and confirm it contains `I'm the remote app` and `Remote SSR component` before hydration. Then confirm both remote counters remain interactive in the browser.
+View the HTML source at `http://localhost:4173` and confirm it contains `Rendered by host before client hydration.` and `Rendered by remote before client hydration.` Then confirm all counters remain interactive in the browser.
 
 The preview ports are fixed. Stop any existing process on `4173` or `4174` before starting the examples.
