@@ -1,6 +1,6 @@
 {
   "name": "@module-federation/nuxt",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "type": "module",
   "description": "Nuxt module for Module Federation using @module-federation/vite",
   "license": "MIT",
