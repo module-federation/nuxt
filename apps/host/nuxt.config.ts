@@ -1,11 +1,13 @@
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
   compatibilityDate: "2025-07-15",
-  devtools: { enabled: true },
-  modules: ["@pinia/nuxt", "@module-federation/nuxt"],
+  experimental: {
+    viteEnvironmentApi: true,
+  },
+  modules: ["@module-federation/nuxt"],
   vite: {
     server: {
-      hmr: {
+      ws: {
         port: 24673,
       },
     },
@@ -22,7 +24,7 @@ export default defineNuxtConfig({
         remote: {
           type: "module",
           name: "remote",
-          entry: `http://localhost:4174/_mf/remoteEntry.js`,
+          entry: "http://localhost:4174/_mf/mf-manifest.json",
           entryGlobalName: "remote",
           shareScope: "default",
         },

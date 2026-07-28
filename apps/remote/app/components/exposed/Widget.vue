@@ -1,10 +1,5 @@
 <script setup lang="ts">
 const count = ref(0);
-const hydrated = ref(false);
-
-onMounted(() => {
-  hydrated.value = true;
-});
 </script>
 
 <template>
@@ -38,22 +33,8 @@ onMounted(() => {
         />
       </svg>
     </div>
-    <div style="margin-top: 10px; font-size: 21px">I'm the remote app</div>
-    <button
-      v-if="hydrated"
-      style="
-        background: #f6b352;
-        border: 0;
-        border-radius: 4px;
-        color: #1f2124;
-        cursor: pointer;
-        display: block;
-        font-weight: 700;
-        margin: 10px auto 12px;
-        padding: 8px 16px;
-      "
-      @click="count++"
-    >
+    <div class="title">I'm the remote app</div>
+    <button class="counter" @click="count++">
       Remote counter: {{ count }}
     </button>
   </div>
@@ -76,12 +57,6 @@ onMounted(() => {
   font-size: 21px;
 }
 
-.theme {
-  margin: 10px 0 16px;
-  font-size: 12px;
-  color: #c9cdd3;
-}
-
 .counter {
   background: #f6b352;
   border: 0;
@@ -90,7 +65,7 @@ onMounted(() => {
   cursor: pointer;
   display: block;
   font-weight: 700;
-  margin: 0 auto 12px;
+  margin: 10px auto 12px;
   padding: 8px 16px;
 }
 </style>

@@ -3,7 +3,12 @@ import { useLogger, type useNuxt } from "@nuxt/kit";
 import { existsSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { resolve } from "node:path";
-import { isJsonObject, parseJsonObject, readString, readStringRecord } from "./json";
+import {
+  isJsonObject,
+  parseJsonObject,
+  readString,
+  readStringRecord,
+} from "./json";
 import type { RemoteSharedInfo } from "./remotes";
 
 type Nuxt = ReturnType<typeof useNuxt>;
@@ -39,6 +44,21 @@ export function getSharedPackageNames(
   if (isJsonObject(shared)) return new Set(Object.keys(shared));
 
   return new Set<string>();
+}
+
+export function getLocallyProvidedSharedPackageNames(
+  shared: ModuleFederationOptions["shared"] | undefined,
+) {
+  if (Array.isArray(shared)) return new Set(shared);
+  if (!isJsonObject(shared)) return new Set<string>();
+
+  return new Set(
+    Object.entries(shared)
+      .filter(
+        ([, config]) => !(isJsonObject(config) && config.import === false),
+      )
+      .map(([packageName]) => packageName),
+  );
 }
 
 /**

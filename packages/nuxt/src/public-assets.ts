@@ -39,14 +39,17 @@ export function registerRemoteEntryAssetCopy(
   options: ModuleOptions,
 ) {
   const outputBase = publicBase.replace(/^\//, "");
+  const buildAssetsDir = normalizeBuildAssetsDir(
+    nuxt.options.app.buildAssetsDir,
+  );
   const remoteEntryFile = resolveRemoteEntryFileName(options);
   const ssrRemoteEntryFile = resolveSsrRemoteEntryFileName(remoteEntryFile);
   const manifestFile = resolveManifestFileName(options);
   const remoteEntryFiles = resolveFederationAssetFileNames(options);
 
-  // Nuxt only copies the _nuxt/ subfolder from dist/client/ to .output/public/.
+  // Nuxt only copies buildAssetsDir from dist/client/ to .output/public/.
   // Federation entries are moved under publicBase, so their root-relative chunk
-  // imports must be rebased back to Nuxt's public _nuxt/ directory.
+  // imports must be rebased back to Nuxt's public build-assets directory.
   nuxt.hook("nitro:build:public-assets", (nitro) => {
     for (const file of remoteEntryFiles) {
       const src = resolve(nitro.options.buildDir, `dist/client/${file}`);
@@ -73,15 +76,24 @@ export function registerRemoteEntryAssetCopy(
               manifestFile,
               remoteEntryFile,
               ssrRemoteEntryFile,
+              buildAssetsDir,
             ),
           );
-        } else if (shouldRebaseNuxtClientImports(file, outputBase)) {
+        } else if (
+          shouldRebaseRemoteEntry(
+            file,
+            outputBase,
+            remoteEntryFile,
+            ssrRemoteEntryFile,
+          )
+        ) {
           writeFileSync(
             dest,
-            rebaseNuxtClientImports(
+            rebaseNuxtAssetImports(
               readFileSync(src, "utf8"),
               outputBase,
               file,
+              buildAssetsDir,
             ),
           );
         } else {
@@ -109,23 +121,36 @@ function ensureParentDir(path: string) {
   mkdirSync(dirname(path), { recursive: true });
 }
 
-function shouldRebaseNuxtClientImports(file: string, outputBase: string) {
+function shouldRebaseRemoteEntry(
+  file: string,
+  outputBase: string,
+  remoteEntryFile: string,
+  ssrRemoteEntryFile: string,
+) {
   return (
-    outputBase.length > 0 && (file.endsWith(".js") || file.endsWith(".mjs"))
+    outputBase.length > 0 &&
+    (file === remoteEntryFile || file === ssrRemoteEntryFile)
   );
 }
 
-function rebaseNuxtClientImports(
+function rebaseNuxtAssetImports(
   source: string,
   outputBase: string,
   file: string,
+  buildAssetsDir: string,
 ) {
+  if (!buildAssetsDir) return source;
+
   const depth = [outputBase, dirname(file)]
     .flatMap((path) => path.split("/"))
     .filter((part) => part && part !== ".").length;
   const prefix = "../".repeat(depth);
+  const relativeAssetPattern = new RegExp(
+    `(["'\`])(?:\\.\\.\\/|\\.\\/)+${escapeRegExp(buildAssetsDir)}\\/`,
+    "g",
+  );
 
-  return source.replace(/(["'`])\.\/_nuxt\//g, `$1${prefix}_nuxt/`);
+  return source.replace(relativeAssetPattern, `$1${prefix}${buildAssetsDir}/`);
 }
 
 function rebaseFederationManifest(
@@ -134,6 +159,7 @@ function rebaseFederationManifest(
   manifestFile: string,
   remoteEntryFile: string,
   ssrRemoteEntryFile: string,
+  buildAssetsDir: string,
 ) {
   const manifest = parseJsonObject(source);
   if (!manifest) return source;
@@ -164,7 +190,7 @@ function rebaseFederationManifest(
   );
 
   for (const expose of getManifestExposeEntries(manifest)) {
-    rebaseManifestAssetGroup(expose.assets, publicRootPrefix);
+    rebaseManifestAssetGroup(expose.assets, publicRootPrefix, buildAssetsDir);
   }
 
   return JSON.stringify(manifest);
@@ -191,7 +217,11 @@ function getManifestExposeEntries(manifest: Record<string, unknown>) {
     : [];
 }
 
-function rebaseManifestAssetGroup(assets: unknown, publicRootPrefix: string) {
+function rebaseManifestAssetGroup(
+  assets: unknown,
+  publicRootPrefix: string,
+  buildAssetsDir: string,
+) {
   if (!isJsonObject(assets)) return;
 
   for (const type of ["js", "css"]) {
@@ -203,7 +233,7 @@ function rebaseManifestAssetGroup(assets: unknown, publicRootPrefix: string) {
       if (!Array.isArray(assetList)) continue;
 
       group[loadType] = assetList.map((asset) =>
-        typeof asset === "string" && isNuxtAsset(asset)
+        typeof asset === "string" && isNuxtAsset(asset, buildAssetsDir)
           ? `${publicRootPrefix}${stripRelativePrefix(asset)}`
           : asset,
       );
@@ -218,9 +248,13 @@ function shouldUseAutoPublicPath(publicPath: unknown) {
   );
 }
 
-function isNuxtAsset(asset: string) {
+function isNuxtAsset(asset: string, buildAssetsDir: string) {
   const normalized = stripRelativePrefix(asset);
-  return normalized.startsWith("_nuxt/");
+  return Boolean(
+    buildAssetsDir &&
+    (normalized === buildAssetsDir ||
+      normalized.startsWith(`${buildAssetsDir}/`)),
+  );
 }
 
 function stripRelativePrefix(value: string) {
@@ -245,4 +279,12 @@ function resolveRelativeUrl(fromDir: string, toPath: string) {
 
 function normalizePublicPath(path: string) {
   return path === "." ? "" : path.replace(/^\/+/, "");
+}
+
+function normalizeBuildAssetsDir(path: string) {
+  return normalizePublicPath(path).replace(/\/+$/, "");
+}
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }

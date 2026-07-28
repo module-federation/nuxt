@@ -15,10 +15,13 @@ export default defineConfig({
   deps: {
     neverBundle: external,
   },
-  dts: true,
+  dts: {
+    sourcemap: true,
+  },
   entry: {
     federation: "./federation.ts",
     "shared-strategy": "./src/runtime/shared-strategy.ts",
+    "ssr-entry-loader": "./src/runtime/ssr-entry-loader.ts",
   },
   format: ["esm"],
   outDir: "dist",

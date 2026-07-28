@@ -1,13 +1,9 @@
 <script setup lang="ts">
-import { useCounterStore } from "../stores/counter";
-const store = useCounterStore();
-const { count } = storeToRefs(store);
+const count = ref(0);
 </script>
 
 <template>
-  <button class="counter" @click="store.increment">
-    Host counter: {{ count }}
-  </button>
+  <button class="counter" @click="count++">Host counter: {{ count }}</button>
 </template>
 
 <style scoped>

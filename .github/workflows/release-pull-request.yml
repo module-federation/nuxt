@@ -1,0 +1,74 @@
+name: Release Pull Request
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: release-pull-request
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Create Release Pull Request
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate release request
+        env:
+          REPO_SCOPED_TOKEN: ${{ secrets.REPO_SCOPED_TOKEN }}
+        run: |
+          if [ "$GITHUB_REF" != "refs/heads/main" ]; then
+            echo "Release pull requests must be created from main."
+            echo "Got: $GITHUB_REF"
+            exit 1
+          fi
+
+          if [ -z "$REPO_SCOPED_TOKEN" ]; then
+            echo "REPO_SCOPED_TOKEN is required so release PR events trigger CI."
+            exit 1
+          fi
+
+      - name: Checkout repo
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          fetch-depth: 10
+          token: ${{ secrets.REPO_SCOPED_TOKEN }}
+
+      - name: Cache tool downloads
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: ~/.cache
+          key: ${{ runner.os }}-toolcache-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-toolcache-
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@b0f76dfb45f55f8421693e4803ac7bb65143bd34 # v6
+        with:
+          version: 9.0.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Create release pull request
+        uses: module-federation/actions@842df3a7740093a5ff44de2b9a890106046b8e32 # v2
+        with:
+          version: latest
+          versionNumber: auto
+          type: pull request
+          tools: changeset
+          coreNpmName: "@module-federation/nuxt"
+        env:
+          GITHUB_TOKEN: ${{ secrets.REPO_SCOPED_TOKEN }}
+          REPOSITORY: ${{ github.repository }}
+          REF: ${{ github.ref }}

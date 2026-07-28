@@ -3,12 +3,14 @@
   "version": "0.0.1",
   "type": "module",
   "description": "Nuxt module for Module Federation using @module-federation/vite",
+  "license": "MIT",
+  "sideEffects": false,
   "main": "./dist/federation.mjs",
   "module": "./dist/federation.mjs",
   "types": "./dist/federation.d.mts",
   "repository": {
     "type": "git",
-    "url": "https://github.com/module-federation/nuxt",
+    "url": "git+https://github.com/module-federation/nuxt.git",
     "directory": "packages/nuxt"
   },
   "bugs": {
@@ -31,11 +33,17 @@
       "import": "./dist/shared-strategy.mjs",
       "default": "./dist/shared-strategy.mjs"
     },
+    "./ssr-entry-loader": {
+      "types": "./dist/ssr-entry-loader.d.mts",
+      "import": "./dist/ssr-entry-loader.mjs",
+      "default": "./dist/ssr-entry-loader.mjs"
+    },
     "./package.json": "./package.json"
   },
   "files": [
     "dist/**/*",
-    "README.md"
+    "README.md",
+    "LICENSE"
   ],
   "publishConfig": {
     "access": "public",
@@ -43,27 +51,28 @@
   },
   "scripts": {
     "build": "tsdown",
-    "dev": "tsdown --watch",
+    "dev": "tsdown --watch --no-clean",
     "pack:dry": "npm pack --dry-run",
     "prepack": "pnpm run build",
     "prepublishOnly": "pnpm run typecheck && pnpm run build",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "engines": {
-    "node": "^22.12.0 || ^24.11.0 || >=26.0.0"
+    "node": "^22.18.0 || ^24.11.0 || >=26.0.0"
   },
   "dependencies": {
-    "@module-federation/vite": "1.16.4",
-    "@nuxt/kit": "^4.4.8",
-    "@nuxt/schema": "^4.4.8"
+    "@module-federation/runtime": "2.8.1",
+    "@module-federation/vite": "1.20.0",
+    "@nuxt/kit": "^4.5.1",
+    "@nuxt/schema": "^4.5.1"
   },
   "peerDependencies": {
-    "nuxt": "^4.4.8"
+    "nuxt": ">=4.5.1"
   },
   "devDependencies": {
-    "@types/node": "24",
-    "nuxt": "4.4.8",
-    "tsdown": "^0.21.0",
-    "vue-tsc": "3.2.2"
+    "@types/node": "^26.1.2",
+    "nuxt": "4.5.1",
+    "tsdown": "^0.22.14",
+    "vue-tsc": "3.3.8"
   }
 }

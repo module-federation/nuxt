@@ -1,5 +1,5 @@
-import { defineNuxtModule, useLogger, useNuxt } from "@nuxt/kit";
-import type { Nuxt, NuxtModule } from "@nuxt/schema";
+import { defineNuxtModule, useNuxt } from "@nuxt/kit";
+import type { NuxtModule } from "@nuxt/schema";
 import { registerExposedComponents, resolveExposedDir } from "./exposes";
 import {
   defaultModuleOptions,
@@ -9,11 +9,7 @@ import {
 import { registerRemoteEntryAssetCopy } from "./public-assets";
 import { registerRemoteComponents, resolveRemoteComponents } from "./remotes";
 import { registerRemoteEntryRoutes } from "./routes";
-import {
-  readInstalledPackageVersion,
-  resolveSharedConfig,
-  warnOnSharedVersionMismatches,
-} from "./shared";
+import { resolveSharedConfig, warnOnSharedVersionMismatches } from "./shared";
 import { registerCorsPlugin, registerFederationPlugin } from "./vite";
 
 const module: NuxtModule<ModuleOptions> = defineNuxtModule<ModuleOptions>({
@@ -37,42 +33,24 @@ const module: NuxtModule<ModuleOptions> = defineNuxtModule<ModuleOptions>({
         manifestFetchTimeoutMs: options.manifestFetchTimeoutMs,
         remotes: config.remotes,
       });
-    const serverFederation =
-      options.ssr !== false &&
-      nuxt.options.ssr &&
-      (!nuxt.options.dev || supportsDevServerFederation(nuxt));
+    const renderRemoteComponents =
+      Boolean(nuxt.options.ssr) && options.ssr !== false;
 
     warnOnSharedVersionMismatches(nuxt, config.shared, remoteShared);
     registerRemoteEntryRoutes(nuxt, publicBase, options);
-    registerRemoteComponents(remoteComponents, { server: serverFederation });
+    registerRemoteComponents(remoteComponents, {
+      hostName: config.name || "remote",
+      server: renderRemoteComponents,
+    });
     registerRemoteEntryAssetCopy(nuxt, publicBase, options);
-    registerFederationPlugin(
+    await registerFederationPlugin(
       { ...options, config },
       exposed,
       nuxt.options.rootDir,
-      { server: serverFederation },
+      { remoteSsr: renderRemoteComponents },
     );
     registerCorsPlugin();
   },
 });
-
-// The @module-federation/vite ssrEntryLoader loads remote SSR entries in dev
-// through Vite's ModuleRunner and the remote's /__mf_runner__ endpoint, which
-// require Vite 8+. On older Vite versions the runner protocol mismatch makes
-// the SSR render hang, so fall back to client-only remote components in dev.
-function supportsDevServerFederation(nuxt: Nuxt) {
-  const viteVersion = readInstalledPackageVersion(nuxt.options.rootDir, "vite");
-  const viteMajor = Number(viteVersion?.split(".")[0]);
-  if (Number.isFinite(viteMajor) && viteMajor >= 8) return true;
-
-  useLogger("module-federation").info(
-    `Server-side rendering of remote components in dev requires Vite 8+` +
-      `${viteVersion ? ` (found ${viteVersion})` : ""}; ` +
-      `remote components will render client-only in dev. ` +
-      `Production builds still render them on the server.`,
-  );
-
-  return false;
-}
 
 export default module;

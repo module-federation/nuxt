@@ -2,16 +2,16 @@ import type { ModuleFederationOptions } from "@module-federation/vite";
 import { addComponent, addTemplate, addTypeTemplate } from "@nuxt/kit";
 import { isJsonObject, parseJsonObject, readString } from "./json";
 import { DEFAULT_MANIFEST_FETCH_TIMEOUT_MS } from "./options";
+import {
+  assertUniqueRemoteComponents,
+  createRemoteComponent,
+  createRemoteRefProxy,
+  type RemoteComponent,
+} from "./remote-component-utils";
+
+export type { RemoteComponent } from "./remote-component-utils";
 
 type RemoteConfig = NonNullable<ModuleFederationOptions["remotes"]>[string];
-
-export interface RemoteComponent {
-  componentName: string;
-  exposedName: string;
-  exportName: string;
-  importPath: string;
-  remoteName: string;
-}
 
 export interface RemoteSharedInfo {
   name: string;
@@ -52,64 +52,135 @@ export async function resolveRemoteComponents(options: {
       );
     }),
   );
+  const resolvedComponents = components.flat();
+  assertUniqueRemoteComponents(resolvedComponents);
 
-  return { components: components.flat(), remoteShared };
+  return { components: resolvedComponents, remoteShared };
 }
 
 export function registerRemoteComponents(
   components: RemoteComponent[],
-  options: { server?: boolean } = {},
+  options: { hostName?: string; server?: boolean } = {},
 ) {
   if (components.length > 0) {
     const renderOnServer = options.server !== false;
+    const hostName = options.hostName || "remote";
 
     addTemplate({
       filename: "remote-components.mjs",
       async getContents() {
         return `
-        import { defineAsyncComponent, defineComponent, h, onMounted, ref } from "vue";
+        import { defineAsyncComponent, defineComponent, h, onMounted, ref, shallowRef } from "vue";
+
+        const createRemoteRefProxy = ${createRemoteRefProxy.toString()};
+
+        const createRemoteRef = (expose) => {
+          const inner = shallowRef();
+          const target = {};
+
+          // This wrapper owns the parent template ref. Expose a facade that
+          // follows Vue's async-component ref to the resolved remote instance.
+          expose(createRemoteRefProxy(target, () => inner.value));
+
+          return inner;
+        };
 
         const createClientOnlyRemote = (name, component) => defineComponent({
           name,
-          setup(_, { attrs, slots }) {
+          setup(_, { attrs, expose, slots }) {
             const mounted = ref(false);
+            const remoteRef = createRemoteRef(expose);
             onMounted(() => {
               mounted.value = true;
             });
 
-            return () => mounted.value ? h(component, attrs, slots) : null;
+            return () => mounted.value
+              ? h(component, { ...attrs, ref: remoteRef }, slots)
+              : null;
           },
         });
 
-        const ssrFallback = defineComponent({
-          name: "RemoteSsrFallback",
-          setup: () => () => null,
-        });
+        const ssrRuntimeKey = Symbol.for("@module-federation/nuxt:ssr-runtime");
+        const getSsrRuntime = (hostName) =>
+          globalThis[ssrRuntimeKey]?.get(hostName);
 
-        const loadRemote = (importPath, load) =>
-          load().catch((error) => {
-            if (typeof window !== "undefined") throw error;
+        const normalizeRemote = (loaded, importPath) => {
+          const component = loaded?.default || loaded;
+          if (component) return component;
 
-            console.warn(
-              "[module-federation] Failed to load " + importPath + " during SSR;" +
-              " rendering nothing on the server. The client will render it after hydration.",
-              error,
-            );
-            return ssrFallback;
+          throw new Error(
+            "[module-federation] Remote " + importPath + " did not export a component.",
+          );
+        };
+
+        const loadSsrRemote = async (hostName, remoteName, importPath, bootstrap) => {
+          let runtime = getSsrRuntime(hostName);
+          try {
+            let loaded;
+            if (runtime) {
+              loaded = await runtime.load(remoteName, importPath);
+            } else {
+              loaded = await bootstrap();
+              runtime = getSsrRuntime(hostName);
+              const component = normalizeRemote(loaded, importPath);
+              runtime?.markLoaded?.(remoteName);
+              return component;
+            }
+            return normalizeRemote(loaded, importPath);
+          } catch (error) {
+            try {
+              (runtime || getSsrRuntime(hostName))?.invalidate(remoteName);
+            } catch {
+              // Preserve the original remote loading error.
+            }
+            throw error;
+          }
+        };
+
+        const createSsrRemote = (name, hostName, remoteName, importPath, bootstrap) => {
+          const clientComponent = defineAsyncComponent({
+            loader: () => bootstrap().then((loaded) => normalizeRemote(loaded, importPath)),
+            suspensible: true,
           });
+
+          return defineComponent({
+            name,
+            setup(_, { attrs, expose, slots }) {
+              const remoteRef = createRemoteRef(expose);
+              if (typeof window !== "undefined") {
+                return () => h(clientComponent, { ...attrs, ref: remoteRef }, slots);
+              }
+
+              return loadSsrRemote(hostName, remoteName, importPath, bootstrap)
+                .then((component) => () =>
+                  h(component, { ...attrs, ref: remoteRef }, slots))
+                .catch((error) => {
+                  console.warn(
+                    "[module-federation] Failed to load " + importPath + " during SSR;" +
+                    " rendering nothing on the server. The client will render it after hydration.",
+                    error,
+                  );
+                  return () => null;
+                });
+            },
+          });
+        };
 
         ${components
           .map((component) =>
             renderOnServer
               ? `
-                  export const ${component.exportName} = defineAsyncComponent({
-                    loader: () => loadRemote("${component.importPath}", () => import("${component.importPath}").then((m) => m.default || m)),
-                    suspensible: true,
-                  });
+                  export const ${component.exportName} = createSsrRemote(
+                    "${component.componentName}",
+                    ${JSON.stringify(hostName)},
+                    ${JSON.stringify(component.remoteName)},
+                    ${JSON.stringify(component.importPath)},
+                    () => import(${JSON.stringify(component.importPath)}),
+                  );
                 `
               : `
                   const ${component.exportName}Client = defineAsyncComponent({
-                    loader: () => import("${component.importPath}").then((m) => m.default || m),
+                    loader: () => import(${JSON.stringify(component.importPath)}).then((m) => m.default || m),
                     suspensible: false,
                   });
 
@@ -129,6 +200,7 @@ export function registerRemoteComponents(
         filePath: "#build/remote-components.mjs",
         name: component.componentName,
         export: component.exportName,
+        mode: renderOnServer ? "all" : "client",
       });
     }
 
@@ -141,7 +213,7 @@ export function registerRemoteComponents(
           ${components
             .map(
               (component) => `
-                declare module "${component.importPath}" {
+                declare module ${JSON.stringify(component.importPath)} {
                   const component: Component;
                   export default component;
                 }
@@ -162,26 +234,6 @@ export function registerRemoteComponents(
       },
     });
   }
-}
-
-function createRemoteComponent(
-  remoteName: string,
-  exposedName: string,
-  remoteCount: number,
-): RemoteComponent {
-  const componentSuffix = toPascalCase(exposedName);
-  const componentName =
-    remoteCount === 1
-      ? `Remote${componentSuffix}`
-      : `Remote${toPascalCase(remoteName)}${componentSuffix}`;
-
-  return {
-    componentName,
-    exposedName,
-    exportName: `${toIdentifier(remoteName)}_${componentSuffix}`,
-    importPath: `${remoteName}/${exposedName}`,
-    remoteName,
-  };
 }
 
 async function fetchRemoteManifest(
@@ -307,18 +359,4 @@ function readManifestExposes(manifest: Record<string, unknown>) {
     const name = readString(expose, "name") || readString(expose, "path");
     return name ? [name] : [];
   });
-}
-
-function toIdentifier(value: string) {
-  const identifier = toPascalCase(value);
-  return identifier.charAt(0).toLowerCase() + identifier.slice(1);
-}
-
-function toPascalCase(value: string) {
-  return value
-    .replace(/^\.\//, "")
-    .split(/[^A-Za-z0-9]+/)
-    .filter(Boolean)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join("");
 }

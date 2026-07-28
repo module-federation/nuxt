@@ -2,17 +2,17 @@
   "name": "nuxt-remote",
   "type": "module",
   "scripts": {
-    "build": "pnpm --filter @module-federation/nuxt build && nuxt build",
-    "predev": "pnpm --filter @module-federation/nuxt build && nuxt prepare",
+    "build": "nuxt build",
+    "predev": "nuxt prepare",
     "dev": "nuxt dev --port 4174",
-    "generate": "pnpm --filter @module-federation/nuxt build && nuxt generate",
-    "preview": "pnpm --filter @module-federation/nuxt build && nuxt preview --port 4174",
-    "typecheck": "pnpm --filter @module-federation/nuxt build && nuxt typecheck"
+    "generate": "nuxt generate",
+    "preview": "nuxt preview --port 4174",
+    "typecheck": "nuxt typecheck"
   },
   "dependencies": {
     "@module-federation/nuxt": "workspace:*",
-    "nuxt": "4.4.8",
-    "vue": "3.5.29",
-    "vue-router": "4.6.4"
+    "nuxt": "4.5.1",
+    "vue": "3.5.40",
+    "vue-router": "5.2.0"
   }
 }
