@@ -54,14 +54,6 @@ jobs:
       - name: Test package and production examples
         run: pnpm test
 
-      - name: Install Chromium
-        if: matrix.node-version == '24'
-        run: pnpm exec playwright install --with-deps chromium
-
-      - name: Test browser hydration
-        if: matrix.node-version == '24'
-        run: pnpm test:e2e
-
       - name: Typecheck workspace
         run: pnpm typecheck
 

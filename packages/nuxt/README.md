@@ -4,7 +4,7 @@ Nuxt integration for Module Federation, built on top of `@module-federation/vite
 
 ## Requirements
 
-- Nuxt `^4.5.1` (Vite 8 with Rolldown)
+- Nuxt `>=4.5.1` (Vite 8 with Rolldown)
 - Node.js `^22.18.0`, `^24.11.0`, or `>=26.0.0`
 
 Production builds support server-rendered remote components on writable Node deployments. The default upstream SSR loader writes fetched modules under `process.cwd()/node_modules/.ssr-cache`; read-only and serverless filesystems are not currently supported for remote SSR.

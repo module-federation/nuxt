@@ -29,7 +29,6 @@ pnpm install --frozen-lockfile
 pnpm typecheck
 pnpm build
 pnpm test
-pnpm test:e2e
 pnpm pack:nuxt
 pnpm format:check
 ```

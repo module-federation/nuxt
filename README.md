@@ -112,8 +112,6 @@ The ports are fixed because the host's remote URL depends on the remote remainin
 pnpm typecheck
 pnpm build
 pnpm test
-pnpm exec playwright install chromium
-pnpm test:e2e
 pnpm pack:nuxt
 ```
 

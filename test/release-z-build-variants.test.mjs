@@ -1,12 +1,13 @@
 import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
-import { extname, join, resolve } from "node:path";
-import { tmpdir } from "node:os";
+import { readFile, rm } from "node:fs/promises";
+import { extname, resolve } from "node:path";
 import test from "node:test";
 import {
   assertManifestAssetsExist,
   assertPublishedSsrExposeGraph,
+  createNuxtFixture,
+  nuxtCliPath,
   readRelativeModuleGraph,
   runCommand,
   walkFiles,
@@ -16,20 +17,16 @@ test(
   "MF Vite's test-environment no-op remains a no-op",
   { timeout: 45_000 },
   async (context) => {
-    const fixtureRoot = await mkdtemp(join(tmpdir(), "nuxt-mf-test-env-"));
-    const buildDir = resolve(fixtureRoot, "build");
-    const outputRoot = resolve(fixtureRoot, "output");
+    const fixtureRoot = await createNuxtFixture("remote");
     context.after(() => rm(fixtureRoot, { force: true, recursive: true }));
 
     await runCommand(
-      "pnpm",
-      ["--filter", "nuxt-remote", "exec", "nuxt", "build"],
+      process.execPath,
+      [nuxtCliPath("remote"), "build", fixtureRoot],
       {
         env: {
           ...process.env,
           NODE_ENV: "test",
-          NUXT_MF_BUILD_DIR: buildDir,
-          NUXT_MF_OUTPUT_DIR: outputRoot,
         },
       },
     );
@@ -40,22 +37,24 @@ test(
   "disabled remote SSR does not bundle the writable cache loader",
   { timeout: 45_000 },
   async (context) => {
-    const outputRoot = await mkdtemp(join(tmpdir(), "nuxt-mf-host-no-ssr-"));
-    context.after(() => rm(outputRoot, { force: true, recursive: true }));
-    await runCommand(
-      "pnpm",
-      ["--filter", "nuxt-host", "exec", "nuxt", "build"],
-      {
-        env: {
-          ...process.env,
-          NUXT_MF_OUTPUT_DIR: outputRoot,
-          NUXT_MF_REMOTE_ONLY_SHARED: "true",
-          NUXT_MF_REMOTE_SSR: "false",
+    const fixtureRoot = await createNuxtFixture("host", {
+      moduleFederation: {
+        ssr: false,
+        config: {
+          shared: {
+            "remote-provided-package": { import: false },
+          },
         },
       },
-    );
+    });
+    context.after(() => rm(fixtureRoot, { force: true, recursive: true }));
+    await runCommand(process.execPath, [
+      nuxtCliPath("host"),
+      "build",
+      fixtureRoot,
+    ]);
 
-    const serverOutput = resolve(outputRoot, "server");
+    const serverOutput = resolve(fixtureRoot, ".output/server");
     const sources = await Promise.all(
       (await walkFiles(serverOutput))
         .filter((path) => [".js", ".mjs"].includes(extname(path)))
@@ -70,23 +69,24 @@ test(
   "client-only remote consumption still publishes server exposes",
   { timeout: 45_000 },
   async (context) => {
-    const outputRoot = await mkdtemp(join(tmpdir(), "nuxt-mf-remote-no-ssr-"));
     const ssrEntryFile = "entries/remoteEntry.ssr.js";
-    context.after(() => rm(outputRoot, { force: true, recursive: true }));
-    await runCommand(
-      "pnpm",
-      ["--filter", "nuxt-remote", "exec", "nuxt", "build"],
-      {
-        env: {
-          ...process.env,
-          NUXT_MF_BUILD_ASSETS_DIR: "/_assets/",
-          NUXT_MF_ENVIRONMENT_API: "true",
-          NUXT_MF_FILENAME: "entries/remoteEntry.js",
-          NUXT_MF_OUTPUT_DIR: outputRoot,
-          NUXT_MF_REMOTE_SSR: "false",
+    const fixtureRoot = await createNuxtFixture("remote", {
+      app: { buildAssetsDir: "/_assets/" },
+      experimental: { viteEnvironmentApi: true },
+      moduleFederation: {
+        ssr: false,
+        config: {
+          filename: "entries/remoteEntry.js",
         },
       },
-    );
+    });
+    const outputRoot = resolve(fixtureRoot, ".output");
+    context.after(() => rm(fixtureRoot, { force: true, recursive: true }));
+    await runCommand(process.execPath, [
+      nuxtCliPath("remote"),
+      "build",
+      fixtureRoot,
+    ]);
 
     assert.ok(
       existsSync(resolve(outputRoot, "public/_mf", ssrEntryFile)),
@@ -110,20 +110,17 @@ test(
   "Nuxt SPA builds retain server federation compatibility",
   { timeout: 45_000 },
   async (context) => {
-    const outputRoot = await mkdtemp(join(tmpdir(), "nuxt-mf-remote-spa-"));
-    context.after(() => rm(outputRoot, { force: true, recursive: true }));
-    await runCommand(
-      "pnpm",
-      ["--filter", "nuxt-remote", "exec", "nuxt", "build"],
-      {
-        env: {
-          ...process.env,
-          NUXT_MF_ENVIRONMENT_API: "true",
-          NUXT_MF_NUXT_SSR: "false",
-          NUXT_MF_OUTPUT_DIR: outputRoot,
-        },
-      },
-    );
+    const fixtureRoot = await createNuxtFixture("remote", {
+      experimental: { viteEnvironmentApi: true },
+      ssr: false,
+    });
+    const outputRoot = resolve(fixtureRoot, ".output");
+    context.after(() => rm(fixtureRoot, { force: true, recursive: true }));
+    await runCommand(process.execPath, [
+      nuxtCliPath("remote"),
+      "build",
+      fixtureRoot,
+    ]);
 
     assert.ok(
       existsSync(resolve(outputRoot, "public/_mf/remoteEntry.ssr.js")),

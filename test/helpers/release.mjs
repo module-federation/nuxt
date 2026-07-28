@@ -2,7 +2,13 @@ import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
 import { existsSync } from "node:fs";
-import { readdir, readFile, realpath } from "node:fs/promises";
+import {
+  mkdtemp,
+  readdir,
+  readFile,
+  realpath,
+  writeFile,
+} from "node:fs/promises";
 import { createServer } from "node:net";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -11,6 +17,22 @@ export const repoRoot = resolve(
   dirname(fileURLToPath(import.meta.url)),
   "../..",
 );
+
+export async function createNuxtFixture(app, config = {}) {
+  const layer = resolve(repoRoot, "apps", app);
+  const root = await mkdtemp(join(layer, ".nuxt-mf-test-"));
+  const source = `export default ${JSON.stringify(
+    { extends: [layer], srcDir: resolve(layer, "app"), ...config },
+    null,
+    2,
+  )};\n`;
+  await writeFile(resolve(root, "nuxt.config.mjs"), source);
+  return root;
+}
+
+export function nuxtCliPath(app) {
+  return resolve(repoRoot, "apps", app, "node_modules/nuxt/bin/nuxt.mjs");
+}
 
 export async function assertPublishedSsrExposeGraph(
   publicRoot,

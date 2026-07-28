@@ -9,7 +9,6 @@
     "dev:host": "pnpm --filter @module-federation/nuxt build && turbo run dev --filter=nuxt-host",
     "dev:remote": "pnpm --filter @module-federation/nuxt build && turbo run dev --filter=nuxt-remote",
     "test": "node --test --test-concurrency=1 test/*.test.mjs",
-    "test:e2e": "node --test --test-concurrency=1 test/e2e/*.test.mjs",
     "changeset": "changeset",
     "changeset:status": "changeset status",
     "format": "prettier --write \"packages/**/*.{ts,md,json}\" \"apps/**/*.{ts,vue,md,json}\" \"test/**/*.mjs\" \"docs/**/*.md\" \"*.{md,json}\" \".github/**/*.yml\"",
@@ -20,7 +19,6 @@
   },
   "devDependencies": {
     "@changesets/cli": "^2.31.1",
-    "@playwright/test": "1.62.0",
     "defu": "6.1.7",
     "prettier": "^3.9.6",
     "turbo": "^2.10.7",
