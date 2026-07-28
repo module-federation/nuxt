@@ -281,14 +281,20 @@ async function followSameOriginRedirects(entry: string, timeoutMs: number) {
 
   let current = initial;
   for (let redirect = 0; redirect < MAX_ENTRY_REDIRECTS; redirect += 1) {
-    const response = await fetch(current, {
-      method: "HEAD",
-      redirect: "manual",
-      signal:
-        Number.isFinite(timeoutMs) && timeoutMs > 0
-          ? AbortSignal.timeout(timeoutMs)
-          : undefined,
-    });
+    const timeout =
+      Number.isFinite(timeoutMs) && timeoutMs > 0
+        ? createRefedTimeoutSignal(timeoutMs)
+        : undefined;
+    let response: Response;
+    try {
+      response = await fetch(current, {
+        method: "HEAD",
+        redirect: "manual",
+        signal: timeout?.signal,
+      });
+    } finally {
+      timeout?.clear();
+    }
     if (![301, 302, 303, 307, 308].includes(response.status)) {
       return current.href;
     }
@@ -391,20 +397,42 @@ function installManifestFetchTimeout(
       return emit(input, init, remoteInfo, resourceContext);
     }
 
-    const timeoutSignal = AbortSignal.timeout(timeoutMs);
+    const timeout = createRefedTimeoutSignal(timeoutMs);
+    const timeoutSignal = timeout.signal;
     const signal = init?.signal
       ? AbortSignal.any([init.signal, timeoutSignal])
       : timeoutSignal;
     const requestInit = { ...init, signal };
-    const customResponse = await waitForAbort(
-      emit(input, requestInit, remoteInfo, resourceContext),
-      signal,
-    );
-    if (customResponse instanceof Response) return customResponse;
+    try {
+      const customResponse = await waitForAbort(
+        emit(input, requestInit, remoteInfo, resourceContext),
+        signal,
+      );
+      if (customResponse instanceof Response) return customResponse;
 
-    return waitForAbort(fetch(input, requestInit), signal);
+      return await waitForAbort(fetch(input, requestInit), signal);
+    } finally {
+      timeout.clear();
+    }
   };
   fetchHook.emit = timedEmit as unknown as typeof fetchHook.emit;
+}
+
+function createRefedTimeoutSignal(timeoutMs: number) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => {
+    controller.abort(
+      new DOMException(
+        "The operation was aborted due to timeout",
+        "TimeoutError",
+      ),
+    );
+  }, timeoutMs);
+
+  return {
+    clear: () => clearTimeout(timer),
+    signal: controller.signal,
+  };
 }
 
 function waitForAbort<T>(operation: Promise<T>, signal: AbortSignal) {
