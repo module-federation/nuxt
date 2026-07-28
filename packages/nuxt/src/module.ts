@@ -1,5 +1,5 @@
-import { defineNuxtModule, useLogger, useNuxt } from "@nuxt/kit";
-import type { Nuxt, NuxtModule } from "@nuxt/schema";
+import { defineNuxtModule, useNuxt } from "@nuxt/kit";
+import type { NuxtModule } from "@nuxt/schema";
 import { registerExposedComponents, resolveExposedDir } from "./exposes";
 import {
   defaultModuleOptions,
@@ -11,7 +11,6 @@ import { registerRemoteComponents, resolveRemoteComponents } from "./remotes";
 import { registerRemoteEntryRoutes } from "./routes";
 import { resolveSharedConfig, warnOnSharedVersionMismatches } from "./shared";
 import { registerCorsPlugin, registerFederationPlugin } from "./vite";
-import { readNuxtViteBuilderVersion } from "./vite-version";
 
 const module: NuxtModule<ModuleOptions> = defineNuxtModule<ModuleOptions>({
   meta: {
@@ -35,9 +34,7 @@ const module: NuxtModule<ModuleOptions> = defineNuxtModule<ModuleOptions>({
         remotes: config.remotes,
       });
     const renderRemoteComponents =
-      Boolean(nuxt.options.ssr) &&
-      options.ssr !== false &&
-      (!nuxt.options.dev || supportsDevServerFederation(nuxt));
+      Boolean(nuxt.options.ssr) && options.ssr !== false;
 
     warnOnSharedVersionMismatches(nuxt, config.shared, remoteShared);
     registerRemoteEntryRoutes(nuxt, publicBase, options);
@@ -55,24 +52,5 @@ const module: NuxtModule<ModuleOptions> = defineNuxtModule<ModuleOptions>({
     registerCorsPlugin();
   },
 });
-
-// The @module-federation/vite ssrEntryLoader loads remote SSR entries in dev
-// through Vite's ModuleRunner and the remote's /__mf_runner__ endpoint, which
-// require Vite 8+. On older Vite versions the runner protocol mismatch makes
-// the SSR render hang, so fall back to client-only remote components in dev.
-function supportsDevServerFederation(nuxt: Nuxt) {
-  const viteVersion = readNuxtViteBuilderVersion(nuxt.options.rootDir);
-  const viteMajor = Number(viteVersion?.split(".")[0]);
-  if (Number.isFinite(viteMajor) && viteMajor >= 8) return true;
-
-  useLogger("module-federation").info(
-    `Server-side rendering of remote components in dev requires Vite 8+` +
-      `${viteVersion ? ` (found ${viteVersion})` : ""}; ` +
-      `remote components will render client-only in dev. ` +
-      `Production builds still render them on the server.`,
-  );
-
-  return false;
-}
 
 export default module;

@@ -44,9 +44,12 @@ export async function assertPublishedSsrExposeGraph(
     exposedModules.length > 0,
     `${buildLabel} SSR entry does not reach any exposed modules`,
   );
-  for (const [path, exposedSource] of exposedModules) {
+  for (const [path] of exposedModules) {
+    const exposedGraphSource = (
+      await readRelativeSourcesFromGraph(graph, path)
+    ).join("\n");
     assert.match(
-      exposedSource,
+      exposedGraphSource,
       /__ssrInlineRender|ssrRender(?:Attrs|Component)/,
       `${buildLabel} expose ${relative(publicRoot, path)} is not server-transformed`,
     );
@@ -80,6 +83,32 @@ export async function assertPublishedSsrExposeGraph(
       );
     }
   }
+}
+
+async function readRelativeSourcesFromGraph(graph, entryPath) {
+  const pending = [entryPath];
+  const visited = new Set();
+  const sources = [];
+
+  while (pending.length > 0) {
+    const path = pending.pop();
+    if (visited.has(path)) continue;
+    visited.add(path);
+
+    const source = graph.get(path);
+    if (!source) continue;
+    sources.push(source);
+
+    for (const specifier of findModuleImports(source)) {
+      if (!specifier.startsWith(".")) continue;
+      const importedPath = await realpath(
+        resolve(dirname(path), specifier.replace(/[?#].*$/, "")),
+      );
+      if (graph.has(importedPath)) pending.push(importedPath);
+    }
+  }
+
+  return sources;
 }
 
 export async function assertManifestAssetsExist(publicRoot) {

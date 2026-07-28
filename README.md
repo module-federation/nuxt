@@ -10,7 +10,7 @@ Use Module Federation in Nuxt applications with `@module-federation/nuxt`, built
 - Nuxt module wiring for Module Federation hosts and remotes.
 - Convention-based component exposes from `~/components/exposed`.
 - Remote Vue components registered in Nuxt for template auto-imports.
-- Server-rendered remote components in production builds on writable Node deployments.
+- Server-rendered remote components in development and production on writable Node deployments.
 - Client and server remote entries plus an MF manifest under `/_mf`.
 - `vue` and `vue-router` shared as singletons by default.
 
@@ -83,7 +83,7 @@ Remote components render on the Nuxt server by default. Production remotes publi
 
 The default upstream SSR loader writes fetched modules to `node_modules/.ssr-cache` below the server working directory. Use `moduleFederation.ssr: false` for read-only or serverless deployments; see the package deployment contract for details.
 
-Development SSR requires Vite 8 or newer because the MF server runner uses Vite's ModuleRunner protocol. On older Vite versions, remote components render client-only in `nuxt dev`; production builds still render them on the server. Set `moduleFederation.ssr` to `false` to choose client-only rendering in every environment.
+Nuxt 4.5 uses Vite 8's Rolldown pipeline. The MF server runner uses its ModuleRunner protocol, so remote components render during `nuxt dev` as well as production. Set `moduleFederation.ssr` to `false` to choose client-only rendering in every environment.
 
 ## Example applications
 

@@ -14,7 +14,7 @@ export default defineNuxtConfig({
   modules: ["@pinia/nuxt", "@module-federation/nuxt"],
   vite: {
     server: {
-      hmr: {
+      ws: {
         port: 24673,
       },
     },
@@ -41,7 +41,9 @@ export default defineNuxtConfig({
         remote: {
           type: "module",
           name: "remote",
-          entry: `http://localhost:4174/_mf/mf-manifest.json`,
+          entry:
+            process.env.NUXT_MF_REMOTE_URL ||
+            "http://localhost:4174/_mf/mf-manifest.json",
           entryGlobalName: "remote",
           shareScope: "default",
         },

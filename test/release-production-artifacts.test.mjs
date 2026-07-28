@@ -134,7 +134,10 @@ test("server federation keeps the Node target for dual Nuxt builds", async () =>
   assert.ok(remoteEntryPath, "host server federation control chunk is missing");
 
   const source = await readFile(remoteEntryPath, "utf8");
-  assert.match(source, /const isBrowserEnvValue = false;/);
+  assert.match(
+    source,
+    /(?:const isBrowserEnvValue = false;|function isBrowserEnv\(\)\s*{\s*return false;)/,
+  );
 });
 
 test("serial Nuxt builds publish server-transformed exposes", async () => {

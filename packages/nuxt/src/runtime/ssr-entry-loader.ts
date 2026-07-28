@@ -20,6 +20,7 @@ import {
 
 const SSR_RUNTIME_BRIDGES = Symbol.for("@module-federation/nuxt:ssr-runtime");
 const DEFAULT_FETCH_TIMEOUT_MS = 10_000;
+const MAX_ENTRY_REDIRECTS = 5;
 const patchedManifestFetchHooks = new WeakSet<object>();
 
 interface PortableSsrEntryLoaderOptions {
@@ -115,6 +116,8 @@ export default function portableSsrEntryLoader(
     ...upstreamOptions,
     resolvedShared,
   });
+  const knownRemotes = new Map<string, RuntimeRemoteInfo>();
+  const resolvedEntryUrls = new Map<string, Promise<string>>();
   const plugin: PortableSsrEntryLoaderPlugin = {
     ...entryLoader,
     apply(host) {
@@ -125,9 +128,16 @@ export default function portableSsrEntryLoader(
         loadOptions.origin,
         loadOptions.remoteInfo,
       );
+      rememberRemote(knownRemotes, remoteInfo);
+      const entry = await resolveRemoteEntryRedirect(
+        remoteInfo.entry,
+        options.fetchTimeoutMs,
+        resolvedEntryUrls,
+      );
       const container = await entryLoader.loadEntry({
         ...loadOptions,
-        remoteInfo,
+        remoteInfo:
+          entry === remoteInfo.entry ? remoteInfo : { ...remoteInfo, entry },
       });
 
       if (container) return container;
@@ -153,10 +163,16 @@ export default function portableSsrEntryLoader(
           `[module-federation] Host runtime "${hostName}" is not initialized.`,
         );
       }
+      const runtimeImportPath = resolveRuntimeImportPath(
+        host,
+        remoteName,
+        importPath,
+        knownRemotes.get(remoteName),
+      );
 
       const refreshState = refreshStates.get(remoteName);
       if (refreshEnabled && refreshState?.refreshing) {
-        return host.loadRemote(importPath);
+        return host.loadRemote(runtimeImportPath);
       }
 
       if (
@@ -193,10 +209,10 @@ export default function portableSsrEntryLoader(
               refreshState.nextCheckAt = Date.now() + options.maxAgeMs!;
             }
           });
-        return host.loadRemote(importPath);
+        return host.loadRemote(runtimeImportPath);
       }
 
-      const loaded = await host.loadRemote(importPath);
+      const loaded = await host.loadRemote(runtimeImportPath);
       if (refreshEnabled && !refreshState) {
         refreshStates.set(remoteName, {
           nextCheckAt: Date.now() + options.maxAgeMs!,
@@ -227,7 +243,7 @@ export default function portableSsrEntryLoader(
       // Failed loader entries remove themselves from MF Vite's caches. Reset
       // only this host's failed Runtime module; upstream revalidate() clears
       // every federation instance's moduleCache, even when given one URL.
-      resetHostRemote(host, remoteName);
+      resetHostRemote(host, remoteName, knownRemotes.get(remoteName));
     },
   };
 
@@ -241,14 +257,60 @@ export default function portableSsrEntryLoader(
   return plugin;
 }
 
+async function resolveRemoteEntryRedirect(
+  entry: string,
+  timeoutMs = DEFAULT_FETCH_TIMEOUT_MS,
+  cache: Map<string, Promise<string>>,
+) {
+  if (!isManifestUrl(entry) || !URL.canParse(entry)) return entry;
+
+  let resolution = cache.get(entry);
+  if (!resolution) {
+    resolution = followSameOriginRedirects(entry, timeoutMs).catch(() => entry);
+    cache.set(entry, resolution);
+  }
+
+  return resolution;
+}
+
+async function followSameOriginRedirects(entry: string, timeoutMs: number) {
+  const initial = new URL(entry);
+  if (initial.protocol !== "https:" && initial.protocol !== "http:") {
+    return entry;
+  }
+
+  let current = initial;
+  for (let redirect = 0; redirect < MAX_ENTRY_REDIRECTS; redirect += 1) {
+    const response = await fetch(current, {
+      method: "HEAD",
+      redirect: "manual",
+      signal:
+        Number.isFinite(timeoutMs) && timeoutMs > 0
+          ? AbortSignal.timeout(timeoutMs)
+          : undefined,
+    });
+    if (![301, 302, 303, 307, 308].includes(response.status)) {
+      return current.href;
+    }
+
+    const location = response.headers.get("location");
+    if (!location) return current.href;
+
+    const next = new URL(location, current);
+    if (next.origin !== initial.origin) return entry;
+    current = next;
+  }
+
+  return entry;
+}
+
 async function refreshRemoteEntry(
   entryLoader: Pick<PortableSsrEntryLoaderPlugin, "loadEntry">,
   host: RuntimeHost,
   remoteName: string,
 ) {
-  const remote = host.options.remotes.find(
-    (candidate) =>
-      candidate.name === remoteName || candidate.alias === remoteName,
+  const remote = host.options.remotes.find((candidate) =>
+    matchesRemoteName(candidate, remoteName),
   );
   const cachedModule = remote ? host.moduleCache.get(remote.name) : undefined;
   const cachedContainer = cachedModule?.remoteEntryExports;
@@ -368,16 +430,57 @@ function waitForAbort<T>(operation: Promise<T>, signal: AbortSignal) {
   });
 }
 
-function resetHostRemote(host: RuntimeHost, remoteName: string) {
-  const remote = host.options.remotes.find(
-    (candidate) =>
-      candidate.name === remoteName || candidate.alias === remoteName,
+function resetHostRemote(
+  host: RuntimeHost,
+  remoteName: string,
+  knownRemote?: RuntimeRemoteInfo,
+) {
+  const remote = host.options.remotes.find((candidate) =>
+    matchesRemoteName(candidate, remoteName),
   );
-  if (!remote) return;
+  const registeredRemote = remote || knownRemote;
+  if (!registeredRemote) return;
 
   // Keep this ordering: force-registration needs the cached Module in order
   // to clear Runtime's global entry promise for the failed remote.
-  host.registerRemotes([{ ...remote }], { force: true });
+  host.registerRemotes([{ ...registeredRemote }], { force: true });
+}
+
+function rememberRemote(
+  remotes: Map<string, RuntimeRemoteInfo>,
+  remote: RuntimeRemoteInfo,
+) {
+  remotes.set(remote.name, remote);
+  if (remote.alias) remotes.set(remote.alias, remote);
+
+  for (const name of [remote.name, remote.alias]) {
+    const publicName = name?.split("__").at(-1);
+    if (publicName) remotes.set(publicName, remote);
+  }
+}
+
+function matchesRemoteName(
+  candidate: { alias?: string; name: string },
+  remoteName: string,
+) {
+  return [candidate.name, candidate.alias].some(
+    (name) => name === remoteName || name?.endsWith(`__${remoteName}`),
+  );
+}
+
+function resolveRuntimeImportPath(
+  host: RuntimeHost,
+  remoteName: string,
+  importPath: string,
+  knownRemote?: RuntimeRemoteInfo,
+) {
+  const remote =
+    host.options.remotes.find((candidate) =>
+      matchesRemoteName(candidate, remoteName),
+    ) || knownRemote;
+  if (!remote || !importPath.startsWith(`${remoteName}/`)) return importPath;
+
+  return `${remote.name}${importPath.slice(remoteName.length)}`;
 }
 
 function usesAvailableVmStrategy(strategy: "temp-file" | "vm" | undefined) {

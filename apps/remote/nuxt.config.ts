@@ -20,7 +20,7 @@ export default defineNuxtConfig({
   modules: ["@module-federation/nuxt"],
   vite: {
     server: {
-      hmr: {
+      ws: {
         port: 24674,
       },
     },

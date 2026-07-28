@@ -11,10 +11,10 @@
   },
   "dependencies": {
     "@module-federation/nuxt": "workspace:*",
-    "@pinia/nuxt": "0.11.3",
-    "nuxt": "4.4.8",
-    "pinia": "3.0.4",
-    "vue": "3.5.39",
-    "vue-router": "5.1.0"
+    "@pinia/nuxt": "1.0.1",
+    "nuxt": "4.5.1",
+    "pinia": "4.0.2",
+    "vue": "3.5.40",
+    "vue-router": "5.2.0"
   }
 }

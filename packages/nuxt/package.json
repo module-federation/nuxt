@@ -51,7 +51,7 @@
   },
   "scripts": {
     "build": "tsdown",
-    "dev": "tsdown --watch",
+    "dev": "tsdown --watch --no-clean",
     "pack:dry": "npm pack --dry-run",
     "prepack": "pnpm run build",
     "prepublishOnly": "pnpm run typecheck && pnpm run build",
@@ -61,18 +61,18 @@
     "node": "^22.18.0 || ^24.11.0 || >=26.0.0"
   },
   "dependencies": {
-    "@module-federation/runtime": "2.7.0",
-    "@module-federation/vite": "1.18.0",
-    "@nuxt/kit": "^4.4.8",
-    "@nuxt/schema": "^4.4.8"
+    "@module-federation/runtime": "2.8.1",
+    "@module-federation/vite": "1.20.0",
+    "@nuxt/kit": "^4.5.1",
+    "@nuxt/schema": "^4.5.1"
   },
   "peerDependencies": {
-    "nuxt": "^4.4.8"
+    "nuxt": "^4.5.1"
   },
   "devDependencies": {
-    "@types/node": "24",
-    "nuxt": "4.4.8",
-    "tsdown": "^0.22.8",
-    "vue-tsc": "3.3.7"
+    "@types/node": "^26.1.2",
+    "nuxt": "4.5.1",
+    "tsdown": "^0.22.14",
+    "vue-tsc": "3.3.8"
   }
 }

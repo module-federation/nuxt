@@ -38,7 +38,7 @@ The remote must already be reachable on port `4174` for manifest discovery and r
 
 ## SSR behavior
 
-The repository currently runs Nuxt development with Vite 7. Remote components therefore render client-only during `pnpm dev`; the module logs the Vite 8 development-SSR requirement.
+Nuxt 4.5 runs development with Vite 8 and Rolldown. Remote components render on the server during `pnpm dev`, then hydrate and remain interactive in the browser.
 
 Production builds render the remote components on the server. Verify that path from the repository root:
 

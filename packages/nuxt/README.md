@@ -4,11 +4,10 @@ Nuxt integration for Module Federation, built on top of `@module-federation/vite
 
 ## Requirements
 
-- Nuxt `^4.4.8`
+- Nuxt `^4.5.1` (Vite 8 with Rolldown)
 - Node.js `^22.18.0`, `^24.11.0`, or `>=26.0.0`
-- Vite 8 or newer for server-rendered remote components during development
 
-Production builds support server-rendered remote components on writable Node deployments regardless of the development limitation above. The default upstream SSR loader writes fetched modules under `process.cwd()/node_modules/.ssr-cache`; read-only and serverless filesystems are not currently supported for remote SSR.
+Production builds support server-rendered remote components on writable Node deployments. The default upstream SSR loader writes fetched modules under `process.cwd()/node_modules/.ssr-cache`; read-only and serverless filesystems are not currently supported for remote SSR.
 
 ## Install
 
@@ -119,7 +118,9 @@ Only expose names beginning with a letter and containing letters, numbers, under
 - The Nuxt server loads `remoteEntry.ssr.js`.
 - The remote component's HTML is included in the host response and hydrated in the browser.
 
-Development server federation requires Vite 8 or newer. With an older Vite version, `nuxt dev` logs an informational message and renders remote components client-only. `nuxt build` still produces server-rendered remote components.
+Nuxt 4.5 uses Vite 8's Rolldown pipeline. The same federation plugin participates in the client and server environments, so remote components render during both `nuxt dev` and production SSR.
+
+Development remote manifests infer their asset origin from the manifest URL. This keeps `remoteEntry.js` and exposed chunks on the remote origin when the host and remote use different ports. An explicit `config.publicPath` still takes precedence.
 
 Disable remote SSR explicitly when the remote is browser-only:
 

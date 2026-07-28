@@ -107,6 +107,7 @@ export function publishServerExposes<Plugin>(
         plugin,
         entryId,
         config.externalPackages,
+        getExposeModuleIds(config.exposes),
       );
     }
 
@@ -138,6 +139,18 @@ export function publishServerExposes<Plugin>(
     ...patchedPlugins,
     createServerExposePublisher(config, rootDir, clientOutDir),
   ];
+}
+
+function getExposeModuleIds(exposes: FederationConfig["exposes"]) {
+  if (!isJsonObject(exposes)) return [];
+
+  return Object.values(exposes).flatMap((expose) => {
+    if (typeof expose === "string") return [expose];
+    if (isJsonObject(expose) && typeof expose.import === "string") {
+      return [expose.import];
+    }
+    return [];
+  });
 }
 
 function createServerExposePublisher(
@@ -181,6 +194,7 @@ function createServerExposePublisher(
       }
 
       const outputGraph = collectOutputFiles(bundle, entryFile);
+      stripServerExposeQueries(bundle, outputGraph.chunks);
       assertPortableSsrOutputGraph(bundle, outputGraph.chunks);
       outputFiles = outputGraph.files;
       outputChunks = outputGraph.chunks;
@@ -214,6 +228,15 @@ function createServerExposePublisher(
       }
     },
   };
+}
+
+function stripServerExposeQueries(bundle: OutputBundle, chunks: Set<string>) {
+  for (const fileName of chunks) {
+    const output = bundle[fileName];
+    if (output?.type !== "chunk") continue;
+    output.code = output.code.replaceAll(`?__mf_ssr_expose`, "");
+    output.code = output.code.replaceAll(`&__mf_ssr_expose`, "");
+  }
 }
 
 function resolveMfSsrEntryId(config: ServerExposeConfig) {

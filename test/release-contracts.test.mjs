@@ -17,6 +17,7 @@ import {
 } from "../packages/nuxt/src/ssr-entry-loader-config.ts";
 import { assertPortableSsrOutputGraph } from "../packages/nuxt/src/server-output-portability.ts";
 import { createSsrOutputFingerprint } from "../packages/nuxt/src/server-output-fingerprint.ts";
+import { patchServerExposeResolver } from "../packages/nuxt/src/server-expose-resolver.ts";
 import { repoRoot } from "./helpers/release.mjs";
 
 const nuxtPackageRequire = createRequire(
@@ -159,6 +160,12 @@ test("package exports resolve under require conditions", () => {
   );
 });
 
+test("dev watcher preserves the built package during parallel Nuxt startup", () => {
+  const packageJson = nuxtPackageRequire("./package.json");
+
+  assert.match(packageJson.scripts.dev, /(?:^|\s)--no-clean(?:\s|$)/);
+});
+
 test("SSR output fingerprints include server-only module changes", () => {
   const entryFile = "remoteEntry.ssr.js";
   const createBundle = (value) => ({
@@ -221,4 +228,84 @@ test("SSR publisher rejects absolute build-machine imports", () => {
       new Set([fileName]),
     ),
   );
+});
+
+test("SSR expose resolver bundles Rolldown absolute externals", async () => {
+  const entryId = "virtual:mf-REMOTE_ENTRY_SSR_ID:test";
+  const dependencyPath = createRequire(
+    resolve(repoRoot, "apps/remote/package.json"),
+  ).resolve("defu");
+  const plugin = patchServerExposeResolver(
+    {
+      name: "mf:ssr-remote-entry:pre",
+      resolveId() {
+        return { id: dependencyPath, external: "absolute" };
+      },
+    },
+    entryId,
+    [],
+  );
+
+  const resolved = await plugin.resolveId.handler.call({}, "defu", entryId);
+
+  assert.deepEqual(resolved, {
+    id: `${dependencyPath}?__mf_ssr_expose`,
+    external: false,
+  });
+});
+
+test("SSR expose resolver trusts Rolldown's server-graph absolute external", async () => {
+  const dependencyPath = resolve(repoRoot, "node_modules/defu/dist/defu.mjs");
+  const plugin = patchServerExposeResolver(
+    {
+      name: "mf:ssr-remote-entry:pre",
+      resolveId() {
+        return { id: dependencyPath, external: "absolute" };
+      },
+    },
+    "virtual:mf-REMOTE_ENTRY_SSR_ID:test",
+    [],
+  );
+
+  const resolved = await plugin.resolveId.handler.call(
+    {},
+    "defu",
+    "/rolldown/server/expose.js",
+  );
+
+  assert.deepEqual(resolved, {
+    id: `${dependencyPath}?__mf_ssr_expose`,
+    external: false,
+  });
+});
+
+test("SSR expose resolver seeds exposed modules before Rolldown resolves them", async () => {
+  const exposedModule = resolve(
+    repoRoot,
+    "apps/remote/app/components/exposed/Counter.vue",
+  );
+  const dependencyPath = createRequire(
+    resolve(repoRoot, "apps/remote/package.json"),
+  ).resolve("defu");
+  const plugin = patchServerExposeResolver(
+    { name: "mf:ssr-remote-entry:pre" },
+    "virtual:mf-REMOTE_ENTRY_SSR_ID:test",
+    [],
+    [exposedModule],
+  );
+
+  const resolved = await plugin.resolveId.handler.call(
+    {
+      async resolve() {
+        return { id: dependencyPath, external: "absolute" };
+      },
+    },
+    "defu",
+    `${exposedModule}?vue&type=script&setup=true&lang.ts`,
+  );
+
+  assert.deepEqual(resolved, {
+    id: `${dependencyPath}?__mf_ssr_expose`,
+    external: false,
+  });
 });

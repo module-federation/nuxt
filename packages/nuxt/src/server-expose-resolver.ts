@@ -15,7 +15,7 @@ export interface FederationPlugin {
   writeBundle?: unknown;
 }
 
-interface FederationResolvedConfig {
+export interface FederationResolvedConfig {
   createResolver(): FederationResolver;
   environments?: Record<string, FederationResolvedEnvironment | undefined>;
 }
@@ -27,7 +27,7 @@ interface FederationResolvedEnvironment {
 }
 
 interface FederationResolveResult {
-  external?: boolean;
+  external?: boolean | "absolute" | "relative";
   id: string;
 }
 
@@ -76,8 +76,11 @@ export function patchServerExposeResolver(
   plugin: FederationPlugin,
   entryId: string,
   configuredExternals: string[],
+  exposedModuleIds: string[] = [],
 ) {
-  const serverGraph = new Set([normalizeServerGraphId(entryId)]);
+  const serverGraph = new Set(
+    [entryId, ...exposedModuleIds].map(normalizeServerGraphId),
+  );
   const externalPackages = new Set(configuredExternals);
   const originalConfigResolved = plugin.configResolved;
   const originalResolveId = getResolveIdHandler(plugin.resolveId);
@@ -105,7 +108,11 @@ export function patchServerExposeResolver(
           importer,
           options,
         );
-        if (!importer || !isServerGraphImporter(importer, serverGraph)) {
+        const externalFileId = readExternalFileId(upstreamResult);
+        if (
+          !importer ||
+          (!externalFileId && !isServerGraphImporter(importer, serverGraph))
+        ) {
           return upstreamResult;
         }
 
@@ -113,7 +120,6 @@ export function patchServerExposeResolver(
         if (upstreamId) {
           serverGraph.add(normalizeServerGraphId(upstreamId));
         }
-        const externalFileId = readExternalFileId(upstreamResult);
         if (
           (upstreamResult != null && !externalFileId) ||
           !shouldResolveServerDependency(id, externalPackages)
@@ -133,16 +139,21 @@ export function patchServerExposeResolver(
           !contextResolution && !externalFileId && resolveModule
             ? await resolveModule(id, sourceImporter, false, true)
             : undefined;
+        const contextExternalFileId = readExternalFileId(contextResolution);
         const resolvedId =
-          readResolvedId(contextResolution) || externalFileId || fallbackId;
+          contextExternalFileId ||
+          readResolvedId(contextResolution) ||
+          externalFileId ||
+          fallbackId;
         if (!resolvedId) return upstreamResult;
 
         const shouldForceBundle = Boolean(
           externalFileId ||
+          contextExternalFileId ||
           fallbackId ||
           (upstreamResult == null &&
             (isFederationVirtualModuleId(resolvedId) ||
-              isExistingFileModuleId(resolvedId))),
+              (isBareSpecifier(id) && isExistingFileModuleId(resolvedId)))),
         );
         if (shouldForceBundle) {
           const bundledId = withServerExposeQuery(resolvedId);
@@ -248,7 +259,9 @@ function readExternalFileId(result: unknown) {
   }
 
   const resolution = result as FederationResolveResult;
-  return resolution.external === true && isFileModuleId(resolution.id)
+  return resolution.external !== false &&
+    resolution.external !== undefined &&
+    isFileModuleId(resolution.id)
     ? resolution.id
     : undefined;
 }

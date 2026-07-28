@@ -9,6 +9,7 @@ import { isJsonObject, parseJsonObject } from "./json";
 import type { ModuleOptions } from "./options";
 import { isMfRemoteEntryImporter } from "./runtime-plugin-importer";
 import { publishServerExposes } from "./server-exposes";
+import { registerServerSharedExternals } from "./server-shared-externals";
 import {
   getLocallyProvidedSharedPackageNames,
   getSharedPackageNames,
@@ -31,6 +32,7 @@ const COMMON_SSR_SHARED_PACKAGES = [
 ];
 const SHARED_STRATEGY_PLUGIN = "@module-federation/nuxt/shared-strategy";
 const COMMONJS_PROXY_SUFFIX = "?commonjs-proxy";
+const SHARED_IMPORT_RESOLVER = "proxyPreBuildShared:resolve-shared-loadShare";
 const CLIENT_SSR_ENTRY_LOADER_STUB =
   "\0module-federation:nuxt:ssr-entry-loader-stub";
 const DISABLED_SSR_ENTRY_LOADER =
@@ -67,6 +69,23 @@ export async function registerFederationPlugin(
 
   registerRuntimePluginResolver();
   registerServerFederationPrePlugin(enableSsrRemoteLoader);
+  const dev = useNuxt().options.dev;
+  const serverSharedPackages = dev
+    ? [
+        ...new Set([
+          ...ssrShared.locallyProvidedSharedPackages,
+          ...ssrShared.runtimePackages,
+        ]),
+      ]
+    : ssrShared.locallyProvidedSharedPackages;
+  await registerServerSharedExternals(serverSharedPackages, rootDir, dev, [
+    ...new Set([
+      ...ssrShared.runtimePackages,
+      ...(ssrShared.locallyProvidedSharedPackages.includes("vue-router")
+        ? ["vue-router"]
+        : []),
+    ]),
+  ]);
   registerClientSsrEntryLoaderStubPlugin();
   if (enableSsrRemoteLoader) {
     registerNitroTraceIncludes([
@@ -82,7 +101,7 @@ export async function registerFederationPlugin(
   const clientOutDir = resolve(useNuxt().options.buildDir, "dist/client");
   addVitePlugin(() => {
     const config = patchMFConfig(
-      createFederationConfig(options, exposed, rootDir),
+      createFederationConfig(options, exposed, rootDir, dev),
       {
         enableSsrRemoteLoader,
         fetchTimeoutMs: options.ssrFetchTimeoutMs,
@@ -94,7 +113,7 @@ export async function registerFederationPlugin(
     );
 
     return publishServerExposes(
-      federation(config),
+      useNativeServerSharedImports(federation(config)),
       {
         externalPackages: ssrShared.externalPackages,
         exposes: config.exposes,
@@ -113,6 +132,26 @@ export async function registerFederationPlugin(
   registerServerTargetPlugin();
   registerServerCommonJsInteropPlugin(ssrShared.esmExternals);
   registerManifestMetadataPlugin(options);
+}
+
+function useNativeServerSharedImports(plugins: any[]) {
+  return plugins.map((plugin) => {
+    if (plugin?.name !== SHARED_IMPORT_RESOLVER) return plugin;
+
+    return {
+      ...plugin,
+      applyToEnvironment(environment: {
+        name?: string;
+        config?: { consumer?: string };
+      }) {
+        return !(
+          environment.name === "ssr" ||
+          environment.name === "server" ||
+          environment.config?.consumer === "server"
+        );
+      },
+    };
+  });
 }
 
 function patchMFConfig(
@@ -244,17 +283,25 @@ function createFederationConfig(
   options: ModuleOptions,
   exposed: Record<string, string>,
   rootDir: string,
+  dev: boolean,
 ) {
+  const exposes = {
+    ...normalizeExposePaths(exposed, rootDir),
+    ...normalizeExposePaths(options.config?.exposes, rootDir),
+  };
+
   return {
     dts: false,
     name: "remote",
     filename: "remoteEntry.js",
     manifest: resolveManifestOptions(options),
+    ...(dev &&
+    Object.keys(exposes).length > 0 &&
+    options.config?.publicPath === undefined
+      ? { publicPath: "auto" }
+      : {}),
     ...options.config,
-    exposes: {
-      ...normalizeExposePaths(exposed, rootDir),
-      ...normalizeExposePaths(options.config?.exposes, rootDir),
-    },
+    exposes,
   };
 }
 
@@ -331,7 +378,6 @@ async function resolveSsrShared(options: ModuleOptions, rootDir: string) {
     ]),
   ];
   const traceIncludes: string[] = [];
-
   for (const packageName of new Set([
     ...requiredPackages,
     ...runtimePackageNames,
@@ -359,6 +405,7 @@ async function resolveSsrShared(options: ModuleOptions, rootDir: string) {
   return {
     esmExternals,
     externalPackages,
+    locallyProvidedSharedPackages: [...locallyProvidedSharedPackages],
     requiredPackages,
     runtimePackages,
     traceIncludes,
