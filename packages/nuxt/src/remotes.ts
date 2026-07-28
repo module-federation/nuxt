@@ -305,7 +305,7 @@ function resolveManifestUrl(remote: RemoteConfig | undefined) {
   }
 }
 
-function resolveRemoteEntry(remote: RemoteConfig | undefined) {
+export function resolveRemoteEntry(remote: RemoteConfig | undefined) {
   if (!remote) return;
   if (typeof remote !== "string") return remote.entry;
   if (isUrl(remote)) return remote;

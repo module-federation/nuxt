@@ -385,7 +385,7 @@ function publishSsrOutputFingerprint(
   }
 }
 
-function writeSsrOutputFingerprint(path: string, fingerprint: string) {
+export function writeSsrOutputFingerprint(path: string, fingerprint: string) {
   const document: unknown = JSON.parse(readFileSync(path, "utf8"));
   if (!isJsonObject(document)) {
     throw new Error(

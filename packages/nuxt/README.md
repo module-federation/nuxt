@@ -1,11 +1,13 @@
 # @module-federation/nuxt
 
-Nuxt integration for Module Federation, built on top of `@module-federation/vite`.
+Nuxt integration for Module Federation, using `@module-federation/vite` or `@module-federation/enhanced/rspack`.
 
 ## Requirements
 
 - Nuxt `>=4.5.1` (Vite 8 with Rolldown)
 - Node.js `^22.18.0`, `^24.11.0`, or `>=26.0.0`
+
+Rspack applications also require `@nuxt/rspack-builder` matching the installed Nuxt version.
 
 Production builds support server-rendered remote components on writable Node deployments. The default upstream SSR loader writes fetched modules under `process.cwd()/node_modules/.ssr-cache`; read-only and serverless filesystems are not currently supported for remote SSR.
 
@@ -118,7 +120,32 @@ Only expose names beginning with a letter and containing letters, numbers, under
 - The Nuxt server loads `remoteEntry.ssr.js`.
 - The remote component's HTML is included in the host response and hydrated in the browser.
 
-Nuxt 4.5 uses Vite 8's Rolldown pipeline. The same federation plugin participates in the client and server environments, so remote components render during both `nuxt dev` and production SSR.
+Vite uses its ModuleRunner protocol for the server graph. Rspack emits a separate portable server graph. Both builders render remote components during `nuxt dev` and production SSR.
+
+### Rspack builder
+
+Set `builder: "rspack"` and install `@nuxt/rspack-builder` to use federation through `@module-federation/enhanced/rspack`:
+
+```ts
+export default defineNuxtConfig({
+  builder: "rspack",
+  modules: ["@module-federation/nuxt"],
+  moduleFederation: {
+    config: {
+      name: "shell",
+      remotes: {
+        catalog: "catalog@https://catalog.example.com/_mf/mf-manifest.json",
+      },
+    },
+  },
+});
+```
+
+Nuxt creates Rspack compilers through Rsbuild internally, but its module API exposes the generated configuration through `rspack:config`; the Nuxt module installs the Rspack federation plugin at that hook. Browser builds enable `experiments.asyncStartup`; the server build uses synchronous startup so Nuxt can evaluate its SSR entry normally.
+
+Rspack remotes publish `remoteEntry.js`, `remoteEntry.ssr.js`, `mf-manifest.json`, and the server entry's portable chunk graph. The manifest includes `ssrRemoteEntry` and a `nuxtSsrBuildHash`, allowing hosts to load the server graph before hydration and detect later deployments.
+
+Nuxt's Rspack development middleware rejects cross-origin asset requests even when CORS headers are present. For cross-port local development, proxy the remote manifest and its configured `app.buildAssetsDir` through the host origin. The repository's `host-rspack` and `remote-rspack` examples provide a complete proxy setup. Production servers that allow cross-origin assets can use direct remote URLs.
 
 Development remote manifests infer their asset origin from the manifest URL. This keeps `remoteEntry.js` and exposed chunks on the remote origin when the host and remote use different ports. An explicit `config.publicPath` still takes precedence.
 
@@ -203,9 +230,9 @@ Configure these values under `moduleFederation` in `nuxt.config.ts`.
 | `ssr`                    | `boolean`                          | `true`                   | Render consumed remote components on the Nuxt server. Server exposes are still published when `false`. |
 | `ssrFetchTimeoutMs`      | `number`                           | `10000`                  | Maximum time for each SSR remote network request; `0` disables the timeout.                            |
 | `ssrManifestMaxAgeMs`    | `number`                           | `30000`                  | Interval before the server re-checks a remote manifest for a new release.                              |
-| `config`                 | `Partial<ModuleFederationOptions>` | See below                | Options passed to `@module-federation/vite`.                                                           |
+| `config`                 | `Partial<ModuleFederationOptions>` | See below                | Options passed to the selected Vite or Rspack federation plugin.                                       |
 
-The MF Vite config defaults are:
+The common federation config defaults are:
 
 ```ts
 {
