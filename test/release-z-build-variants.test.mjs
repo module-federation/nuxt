@@ -74,6 +74,7 @@ test(
       app: { buildAssetsDir: "/_assets/" },
       experimental: { viteEnvironmentApi: true },
       moduleFederation: {
+        base: "/federation",
         ssr: false,
         config: {
           filename: "entries/remoteEntry.js",
@@ -89,20 +90,24 @@ test(
     ]);
 
     assert.ok(
-      existsSync(resolve(outputRoot, "public/_mf", ssrEntryFile)),
+      existsSync(resolve(outputRoot, "public/federation", ssrEntryFile)),
       "ssr: false removed the remote's server entry",
     );
     await assertPublishedSsrExposeGraph(
       resolve(outputRoot, "public"),
       "Environment API client-only remote build",
       ssrEntryFile,
+      "federation",
     );
     const publicRoot = resolve(outputRoot, "public");
     await readRelativeModuleGraph(
       publicRoot,
-      resolve(publicRoot, "_mf/entries/remoteEntry.js"),
+      resolve(publicRoot, "federation/entries/remoteEntry.js"),
     );
-    const manifestAssetCounts = await assertManifestAssetsExist(publicRoot);
+    const manifestAssetCounts = await assertManifestAssetsExist(
+      publicRoot,
+      "federation",
+    );
     assert.ok(
       manifestAssetCounts.shared > 0,
       "custom build-assets fixture did not publish shared manifest assets",
@@ -127,7 +132,7 @@ test(
     ]);
 
     assert.ok(
-      existsSync(resolve(outputRoot, "public/_mf/remoteEntry.ssr.js")),
+      existsSync(resolve(outputRoot, "public/remoteEntry.ssr.js")),
       "Nuxt SPA build removed the remote's server entry",
     );
     await assertPublishedSsrExposeGraph(

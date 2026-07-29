@@ -35,13 +35,13 @@ To add another auto-registered component, create `app/components/exposed/Example
 
 ## Federation assets
 
-Development and production serve the federation contract under `/_mf`:
+Development and production serve the federation contract from the public root:
 
-- `http://localhost:4174/_mf/mf-manifest.json`
-- `http://localhost:4174/_mf/remoteEntry.js`
-- `http://localhost:4174/_mf/remoteEntry.ssr.js`
+- `http://localhost:4174/mf-manifest.json`
+- `http://localhost:4174/remoteEntry.js`
+- `http://localhost:4174/remoteEntry.ssr.js`
 
-The manifest points browser assets back to the application's configured `app.buildAssetsDir` (`/_nuxt` by default). The module also serves a compatibility copy of the browser entry at `/remoteEntry.js` and adds CORS headers to federation assets.
+The manifest points browser assets to the application's configured `app.buildAssetsDir` (`/_nuxt` by default). The module adds CORS headers to federation assets.
 
 ## Production verification
 
@@ -52,4 +52,4 @@ pnpm build
 pnpm preview
 ```
 
-Verify all three `/_mf` URLs above return successfully, then open the host at `http://localhost:4173`. Its initial HTML should already include both remote components, and their counters should become interactive after hydration.
+Verify all three federation URLs above return successfully, then open the host at `http://localhost:4173`. Its initial HTML should already include both remote components, and their counters should become interactive after hydration.

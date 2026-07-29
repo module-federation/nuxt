@@ -38,8 +38,9 @@ export async function assertPublishedSsrExposeGraph(
   publicRoot,
   buildLabel,
   entryFile = "remoteEntry.ssr.js",
+  base = "",
 ) {
-  const entryPath = resolve(publicRoot, "_mf", entryFile);
+  const entryPath = resolve(publicRoot, base, entryFile);
   assert.ok(existsSync(entryPath), `${buildLabel} SSR entry is missing`);
 
   const graph = await readRelativeModuleGraph(publicRoot, entryPath);
@@ -128,8 +129,8 @@ async function readRelativeSourcesFromGraph(graph, entryPath) {
   return sources;
 }
 
-export async function assertManifestAssetsExist(publicRoot) {
-  const manifestPath = resolve(publicRoot, "_mf/mf-manifest.json");
+export async function assertManifestAssetsExist(publicRoot, base = "") {
+  const manifestPath = resolve(publicRoot, base, "mf-manifest.json");
   const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
   const assets = [
     ...collectManifestAssets(manifest.exposes, "expose"),

@@ -48,8 +48,8 @@ export function registerRemoteEntryAssetCopy(
   const remoteEntryFiles = resolveFederationAssetFileNames(options);
 
   // Nuxt only copies buildAssetsDir from dist/client/ to .output/public/.
-  // Federation entries are moved under publicBase, so their root-relative chunk
-  // imports must be rebased back to Nuxt's public build-assets directory.
+  // When federation entries use a non-root publicBase, their root-relative
+  // chunk imports must be rebased back to Nuxt's public build-assets directory.
   nuxt.hook("nitro:build:public-assets", (nitro) => {
     for (const file of remoteEntryFiles) {
       const src = resolve(nitro.options.buildDir, `dist/client/${file}`);

@@ -80,7 +80,7 @@ export default defineNuxtConfig({
         catalog: {
           type: "module",
           name: "catalog",
-          entry: "https://catalog.example.com/_mf/mf-manifest.json",
+          entry: "https://catalog.example.com/mf-manifest.json",
           entryGlobalName: "catalog",
           shareScope: "default",
         },
@@ -171,11 +171,10 @@ Advanced `@module-federation/vite/ssrEntryLoader` `resolvedShared` mappings must
 
 Deploy the complete Nuxt output. By default, a remote serves:
 
-- `/_mf/remoteEntry.js`: browser remote entry
-- `/_mf/remoteEntry.ssr.js`: server remote entry
-- `/_mf/mf-manifest.json`: federation manifest
+- `/remoteEntry.js`: browser remote entry
+- `/remoteEntry.ssr.js`: server remote entry
+- `/mf-manifest.json`: federation manifest
 - `/<buildAssetsDir>/**`: Nuxt and federation chunks referenced by the entries (`/_nuxt/**` by default)
-- `/remoteEntry.js`: compatibility copy for legacy direct-entry consumers
 
 The module adds permissive CORS headers to federation and Nuxt asset routes. Put all of these routes behind the same public origin and do not rewrite one without the others.
 
@@ -196,7 +195,7 @@ Configure these values under `moduleFederation` in `nuxt.config.ts`.
 
 | Option                   | Type                               | Default                  | Description                                                                                            |
 | ------------------------ | ---------------------------------- | ------------------------ | ------------------------------------------------------------------------------------------------------ |
-| `base`                   | `string`                           | `"/_mf"`                 | Public route and output directory for federation entries and the manifest.                             |
+| `base`                   | `string`                           | `"/"`                    | Public route and output directory for federation entries and the manifest.                             |
 | `exposedDir`             | `string`                           | `"~/components/exposed"` | Directory whose Nuxt components are exposed automatically.                                             |
 | `manifestFetchTimeoutMs` | `number`                           | `500`                    | Maximum setup time for fetching each remote manifest.                                                  |
 | `manifestMetadata`       | `Record<string, unknown>`          | `{}`                     | Values merged into `metaData.custom` in generated manifest and stats files.                            |
