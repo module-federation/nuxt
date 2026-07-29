@@ -562,5 +562,58 @@ test(
     assert.deepEqual(forcedRemoteNames, ["remote", "remote"]);
     assert.equal(globalThis.__NUXT_MF_TEST_REVALIDATIONS__, 0);
     assert.ok(host.moduleCache.has("healthy"));
+
+    const stableManifestUrl = "https://remote.test/current/mf-manifest.json";
+    const redirectEntries = [];
+    const originalRefreshEntries = globalThis.__NUXT_MF_TEST_REFRESH_ENTRIES__;
+    globalThis.__NUXT_MF_TEST_CANDIDATE__ = currentContainer;
+    let redirectedRelease = "v1";
+    let stableManifestHeadRequests = 0;
+    const redirectOriginalFetch = globalThis.fetch;
+    globalThis.fetch = async (input, init = {}) => {
+      const url = String(input);
+      if (url === stableManifestUrl && init.method === "HEAD") {
+        stableManifestHeadRequests += 1;
+        return new Response(null, {
+          status: 302,
+          headers: {
+            location: `/releases/${redirectedRelease}/mf-manifest.json`,
+          },
+        });
+      }
+      if (
+        url.startsWith("https://remote.test/releases/") &&
+        init.method === "HEAD"
+      ) {
+        return new Response(null, { status: 200 });
+      }
+      throw new Error(
+        `unexpected redirect probe fetch: ${init.method || "GET"} ${url}`,
+      );
+    };
+    try {
+      globalThis.__NUXT_MF_TEST_REFRESH_ENTRIES__ = redirectEntries;
+      const redirectRemoteInfo = {
+        entry: stableManifestUrl,
+        name: "redirect-remote",
+        version: stableManifestUrl,
+      };
+      await plugin.loadEntry({ origin: host, remoteInfo: redirectRemoteInfo });
+      redirectedRelease = "v2";
+      await plugin.loadEntry({ origin: host, remoteInfo: redirectRemoteInfo });
+
+      assert.deepEqual(redirectEntries, [
+        "https://remote.test/releases/v1/mf-manifest.json",
+        "https://remote.test/releases/v2/mf-manifest.json",
+      ]);
+      assert.equal(
+        stableManifestHeadRequests,
+        2,
+        "manifest refresh did not re-resolve the stable redirect URL",
+      );
+    } finally {
+      globalThis.fetch = redirectOriginalFetch;
+      globalThis.__NUXT_MF_TEST_REFRESH_ENTRIES__ = originalRefreshEntries;
+    }
   },
 );

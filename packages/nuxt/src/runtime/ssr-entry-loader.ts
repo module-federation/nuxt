@@ -45,6 +45,12 @@ interface RemoteRefreshState {
   refreshing?: Promise<void>;
 }
 
+interface RedirectResolution {
+  redirected: boolean;
+  resolvedAt: number;
+  value: Promise<string>;
+}
+
 type RuntimeHost = NonNullable<ReturnType<typeof getInstance>>;
 
 interface RuntimeRemoteInfo {
@@ -117,7 +123,7 @@ export default function portableSsrEntryLoader(
     resolvedShared,
   });
   const knownRemotes = new Map<string, RuntimeRemoteInfo>();
-  const resolvedEntryUrls = new Map<string, Promise<string>>();
+  const resolvedEntryUrls = new Map<string, RedirectResolution>();
   const plugin: PortableSsrEntryLoaderPlugin = {
     ...entryLoader,
     apply(host) {
@@ -132,6 +138,7 @@ export default function portableSsrEntryLoader(
       const entry = await resolveRemoteEntryRedirect(
         remoteInfo.entry,
         options.fetchTimeoutMs,
+        options.maxAgeMs,
         resolvedEntryUrls,
       );
       const container = await entryLoader.loadEntry({
@@ -260,17 +267,38 @@ export default function portableSsrEntryLoader(
 async function resolveRemoteEntryRedirect(
   entry: string,
   timeoutMs = DEFAULT_FETCH_TIMEOUT_MS,
-  cache: Map<string, Promise<string>>,
+  maxAgeMs: number | undefined,
+  cache: Map<string, RedirectResolution>,
 ) {
   if (!isManifestUrl(entry) || !URL.canParse(entry)) return entry;
 
   let resolution = cache.get(entry);
-  if (!resolution) {
-    resolution = followSameOriginRedirects(entry, timeoutMs).catch(() => entry);
-    cache.set(entry, resolution);
+  // Vite revalidates direct manifest URLs itself. Re-resolve only redirects so
+  // a stable URL can move to a newly deployed, immutable manifest URL.
+  if (
+    !resolution ||
+    (resolution.redirected &&
+      typeof maxAgeMs === "number" &&
+      maxAgeMs >= 0 &&
+      Date.now() - resolution.resolvedAt >= maxAgeMs)
+  ) {
+    const nextResolution: RedirectResolution = {
+      redirected: false,
+      resolvedAt: Date.now(),
+      value: Promise.resolve(entry),
+    };
+    nextResolution.value = followSameOriginRedirects(entry, timeoutMs)
+      .catch(() => entry)
+      .then((resolvedEntry) => {
+        nextResolution.redirected = resolvedEntry !== entry;
+        nextResolution.resolvedAt = Date.now();
+        return resolvedEntry;
+      });
+    cache.set(entry, nextResolution);
+    resolution = nextResolution;
   }
 
-  return resolution;
+  return resolution.value;
 }
 
 async function followSameOriginRedirects(entry: string, timeoutMs: number) {
