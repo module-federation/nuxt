@@ -32,7 +32,7 @@ The remote must already be reachable on port `4174` for manifest discovery and r
 `nuxt.config.ts`:
 
 - registers `@module-federation/nuxt`;
-- maps the MF remote name `remote` to `http://localhost:4174/_mf/mf-manifest.json`;
+- maps the MF remote name `remote` to `http://localhost:4174/mf-manifest.json`;
 - lists `Counter` and `Widget` in `remoteComponents`, keeping registration deterministic if the remote manifest is unavailable during setup;
 - exposes them as `<RemoteCounter />` and `<RemoteWidget />` through Nuxt auto-imports.
 

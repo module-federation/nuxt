@@ -18,11 +18,31 @@ import {
 import { assertPortableSsrOutputGraph } from "../packages/nuxt/src/server-output-portability.ts";
 import { createSsrOutputFingerprint } from "../packages/nuxt/src/server-output-fingerprint.ts";
 import { patchServerExposeResolver } from "../packages/nuxt/src/server-expose-resolver.ts";
+import { DEFAULT_BASE, normalizeBase } from "../packages/nuxt/src/options.ts";
+import { resolveBuildAssetUrl } from "../packages/nuxt/src/route-paths.ts";
 import { repoRoot } from "./helpers/release.mjs";
 
 const nuxtPackageRequire = createRequire(
   resolve(repoRoot, "packages/nuxt/package.json"),
 );
+
+test("federation assets use root URLs by default", () => {
+  assert.equal(DEFAULT_BASE, "/");
+  assert.equal(normalizeBase(), "/");
+  assert.equal(normalizeBase("federation/"), "/federation");
+});
+
+test("root dev routes retain the matched federation asset path", () => {
+  assert.equal(
+    resolveBuildAssetUrl(
+      "/",
+      "/_nuxt",
+      "/?channel=stable",
+      "/mf-manifest.json",
+    ),
+    "/_nuxt/mf-manifest.json?channel=stable",
+  );
+});
 
 test("remote component exports remain valid and reject name collisions", () => {
   assert.equal(

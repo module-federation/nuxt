@@ -151,10 +151,15 @@ test("serial Nuxt builds publish server-transformed exposes", async () => {
 test("client manifests preserve the default Vue share scope", async () => {
   for (const app of ["host", "remote"]) {
     const publicRoot = resolve(repoRoot, `apps/${app}/.output/public`);
-    const manifestPath = resolve(publicRoot, "_mf/mf-manifest.json");
+    const manifestPath = resolve(publicRoot, "mf-manifest.json");
     assert.ok(
       existsSync(manifestPath),
       `${app} manifest is missing; build the examples before running tests`,
+    );
+    assert.equal(
+      existsSync(resolve(publicRoot, "_mf/mf-manifest.json")),
+      false,
+      `${app} still publishes the default manifest under /_mf`,
     );
 
     const manifest = JSON.parse(await readFile(manifestPath, "utf8"));

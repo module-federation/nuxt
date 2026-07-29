@@ -24,7 +24,7 @@ export default defineNuxtConfig({
         remote: {
           type: "module",
           name: "remote",
-          entry: "http://localhost:4174/_mf/mf-manifest.json",
+          entry: "http://localhost:4174/mf-manifest.json",
           entryGlobalName: "remote",
           shareScope: "default",
         },
