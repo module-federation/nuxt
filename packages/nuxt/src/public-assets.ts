@@ -189,8 +189,8 @@ function rebaseFederationManifest(
     "",
   );
 
-  for (const expose of getManifestExposeEntries(manifest)) {
-    rebaseManifestAssetGroup(expose.assets, publicRootPrefix, buildAssetsDir);
+  for (const entry of getManifestAssetEntries(manifest)) {
+    rebaseManifestAssetGroup(entry.assets, publicRootPrefix, buildAssetsDir);
   }
 
   return JSON.stringify(manifest);
@@ -211,10 +211,10 @@ function rebaseManifestEntry(
   );
 }
 
-function getManifestExposeEntries(manifest: Record<string, unknown>) {
-  return Array.isArray(manifest.exposes)
-    ? manifest.exposes.filter(isJsonObject)
-    : [];
+function getManifestAssetEntries(manifest: Record<string, unknown>) {
+  return ["exposes", "shared"].flatMap((field) =>
+    Array.isArray(manifest[field]) ? manifest[field].filter(isJsonObject) : [],
+  );
 }
 
 function rebaseManifestAssetGroup(
