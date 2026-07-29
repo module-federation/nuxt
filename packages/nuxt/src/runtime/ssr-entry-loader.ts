@@ -45,10 +45,15 @@ interface RemoteRefreshState {
   refreshing?: Promise<void>;
 }
 
-interface RedirectResolution {
+interface RemoteEntryRedirectResolution {
+  entry: string;
+  redirectProbeFailed: boolean;
+}
+
+interface CachedRemoteEntryRedirect {
   redirected: boolean;
   resolvedAt: number;
-  value: Promise<string>;
+  value: Promise<RemoteEntryRedirectResolution>;
 }
 
 type RuntimeHost = NonNullable<ReturnType<typeof getInstance>>;
@@ -123,7 +128,7 @@ export default function portableSsrEntryLoader(
     resolvedShared,
   });
   const knownRemotes = new Map<string, RuntimeRemoteInfo>();
-  const resolvedEntryUrls = new Map<string, RedirectResolution>();
+  const resolvedEntryUrls = new Map<string, CachedRemoteEntryRedirect>();
   const plugin: PortableSsrEntryLoaderPlugin = {
     ...entryLoader,
     apply(host) {
@@ -135,19 +140,37 @@ export default function portableSsrEntryLoader(
         loadOptions.remoteInfo,
       );
       rememberRemote(knownRemotes, remoteInfo);
-      const entry = await resolveRemoteEntryRedirect(
+      const redirectResolution = await resolveRemoteEntryRedirect(
         remoteInfo.entry,
         options.fetchTimeoutMs,
         options.maxAgeMs,
         resolvedEntryUrls,
       );
+      const entry = redirectResolution.entry;
       const container = await entryLoader.loadEntry({
         ...loadOptions,
         remoteInfo:
           entry === remoteInfo.entry ? remoteInfo : { ...remoteInfo, entry },
       });
 
-      if (container) return container;
+      if (container) {
+        if (redirectResolution.redirectProbeFailed) {
+          // A failed redirect probe may still be a direct manifest URL that
+          // Vite loaded successfully. Do not replace a newer redirect result
+          // if another request resolved it while Vite was loading this entry.
+          if (!resolvedEntryUrls.has(remoteInfo.entry)) {
+            resolvedEntryUrls.set(remoteInfo.entry, {
+              redirected: false,
+              resolvedAt: Date.now(),
+              value: Promise.resolve({
+                entry: remoteInfo.entry,
+                redirectProbeFailed: false,
+              }),
+            });
+          }
+        }
+        return container;
+      }
 
       // Returning undefined lets runtime-core fall through to its generic
       // Node loader, which fetches the browser entry without our timeout.
@@ -268,9 +291,11 @@ async function resolveRemoteEntryRedirect(
   entry: string,
   timeoutMs = DEFAULT_FETCH_TIMEOUT_MS,
   maxAgeMs: number | undefined,
-  cache: Map<string, RedirectResolution>,
+  cache: Map<string, CachedRemoteEntryRedirect>,
 ) {
-  if (!isManifestUrl(entry) || !URL.canParse(entry)) return entry;
+  if (!isManifestUrl(entry) || !URL.canParse(entry)) {
+    return { entry, redirectProbeFailed: false };
+  }
 
   let resolution = cache.get(entry);
   // Vite revalidates direct manifest URLs itself. Re-resolve only redirects so
@@ -282,17 +307,24 @@ async function resolveRemoteEntryRedirect(
       maxAgeMs >= 0 &&
       Date.now() - resolution.resolvedAt >= maxAgeMs)
   ) {
-    const nextResolution: RedirectResolution = {
+    const nextResolution: CachedRemoteEntryRedirect = {
       redirected: false,
       resolvedAt: Date.now(),
-      value: Promise.resolve(entry),
+      value: Promise.resolve({ entry, redirectProbeFailed: false }),
     };
     nextResolution.value = followSameOriginRedirects(entry, timeoutMs)
-      .catch(() => entry)
       .then((resolvedEntry) => {
         nextResolution.redirected = resolvedEntry !== entry;
         nextResolution.resolvedAt = Date.now();
-        return resolvedEntry;
+        return { entry: resolvedEntry, redirectProbeFailed: false };
+      })
+      .catch(() => {
+        // Do not make a transient redirect probe failure permanent. Vite
+        // rejects redirected SSR manifest requests, so the next load retries.
+        if (cache.get(entry) === nextResolution) {
+          cache.delete(entry);
+        }
+        return { entry, redirectProbeFailed: true };
       });
     cache.set(entry, nextResolution);
     resolution = nextResolution;
