@@ -102,7 +102,11 @@ test(
       publicRoot,
       resolve(publicRoot, "_mf/entries/remoteEntry.js"),
     );
-    await assertManifestAssetsExist(publicRoot);
+    const manifestAssetCounts = await assertManifestAssetsExist(publicRoot);
+    assert.ok(
+      manifestAssetCounts.shared > 0,
+      "custom build-assets fixture did not publish shared manifest assets",
+    );
   },
 );
 

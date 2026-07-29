@@ -7,6 +7,7 @@ import { pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 import test from "node:test";
 import {
+  assertManifestAssetsExist,
   assertPublishedSsrExposeGraph,
   repoRoot,
   walkFiles,
@@ -149,10 +150,8 @@ test("serial Nuxt builds publish server-transformed exposes", async () => {
 
 test("client manifests preserve the default Vue share scope", async () => {
   for (const app of ["host", "remote"]) {
-    const manifestPath = resolve(
-      repoRoot,
-      `apps/${app}/.output/public/_mf/mf-manifest.json`,
-    );
+    const publicRoot = resolve(repoRoot, `apps/${app}/.output/public`);
+    const manifestPath = resolve(publicRoot, "_mf/mf-manifest.json");
     assert.ok(
       existsSync(manifestPath),
       `${app} manifest is missing; build the examples before running tests`,
@@ -174,6 +173,11 @@ test("client manifests preserve the default Vue share scope", async () => {
     assert.ok(
       sharedNames.has("vue-router"),
       `${app} manifest does not share vue-router`,
+    );
+    const manifestAssetCounts = await assertManifestAssetsExist(publicRoot);
+    assert.ok(
+      manifestAssetCounts.shared > 0,
+      `${app} manifest did not publish shared assets`,
     );
   }
 });

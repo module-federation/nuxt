@@ -131,22 +131,51 @@ async function readRelativeSourcesFromGraph(graph, entryPath) {
 export async function assertManifestAssetsExist(publicRoot) {
   const manifestPath = resolve(publicRoot, "_mf/mf-manifest.json");
   const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
-  const assets = (manifest.exposes || []).flatMap((expose) =>
-    ["js", "css"].flatMap((type) =>
-      ["sync", "async"].flatMap(
-        (loadType) => expose.assets?.[type]?.[loadType] || [],
-      ),
-    ),
-  );
+  const assets = [
+    ...collectManifestAssets(manifest.exposes, "expose"),
+    ...collectManifestAssets(manifest.shared, "shared"),
+  ];
 
-  for (const asset of assets) {
+  for (const { asset, label } of assets) {
+    assert.equal(
+      typeof asset,
+      "string",
+      `manifest ${label} asset is not a string`,
+    );
     const assetPath = resolve(dirname(manifestPath), asset);
     assert.ok(
       isWithinDirectory(assetPath, publicRoot),
-      `manifest asset escaped the public root: ${asset}`,
+      `manifest ${label} asset escaped the public root: ${asset}`,
     );
-    assert.ok(existsSync(assetPath), `manifest asset is missing: ${asset}`);
+    assert.ok(
+      existsSync(assetPath),
+      `manifest ${label} asset is missing: ${asset}`,
+    );
   }
+
+  return {
+    expose: assets.filter(({ kind }) => kind === "expose").length,
+    shared: assets.filter(({ kind }) => kind === "shared").length,
+  };
+}
+
+function collectManifestAssets(entries, kind) {
+  if (!Array.isArray(entries)) return [];
+
+  return entries.flatMap((entry, index) => {
+    const name = entry?.name ?? entry?.path ?? `#${index}`;
+    const label = `${kind} ${JSON.stringify(name)}`;
+
+    return ["js", "css"].flatMap((type) =>
+      ["sync", "async"].flatMap((loadType) =>
+        (entry?.assets?.[type]?.[loadType] || []).map((asset) => ({
+          asset,
+          kind,
+          label,
+        })),
+      ),
+    );
+  });
 }
 
 export async function readRelativeModuleGraph(publicRoot, entryPath) {
