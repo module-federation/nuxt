@@ -1,15 +1,25 @@
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
   compatibilityDate: "2025-07-15",
+  devtools: { enabled: false },
   modules: ["@module-federation/nuxt"],
-  vite: {
-    server: {
-      ws: {
-        port: 24674,
-      },
-    },
+  experimental: {
+    buildCache: false,
+  },
+  routeRules: {
+    "/remoteEntry.js": { headers: { "Access-Control-Allow-Origin": "*" } },
   },
   moduleFederation: {
-    config: { name: "remote" },
+    config: {
+      name: "remote",
+      filename: "remoteEntry.js",
+      remotes: {},
+      manifest: true,
+    },
+  },
+  vite: {
+    server: {
+      hmr: { port: 24679 },
+    },
   },
 });

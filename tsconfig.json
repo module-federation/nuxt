@@ -3,13 +3,13 @@
   "files": [],
   "references": [
     {
-      "path": "./packages/nuxt"
+      "path": "./packages/nuxt/tsconfig.json"
     },
     {
-      "path": "./apps/host"
+      "path": "./apps/host/tsconfig.json"
     },
     {
-      "path": "./apps/remote"
+      "path": "./apps/remote/tsconfig.json"
     }
   ]
 }

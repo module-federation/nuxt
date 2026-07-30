@@ -1,3 +1,7 @@
+<script setup lang="ts">
+import Counter from "./counter.vue";
+</script>
+
 <template>
   <div class="host-card" data-e2e="APP__CARD">
     <div class="icon">
