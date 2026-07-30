@@ -134,7 +134,7 @@ export default defineNuxtConfig({
     config: {
       name: "shell",
       remotes: {
-        catalog: "catalog@https://catalog.example.com/_mf/mf-manifest.json",
+        catalog: "catalog@https://catalog.example.com/mf-manifest.json",
       },
     },
   },
@@ -143,7 +143,7 @@ export default defineNuxtConfig({
 
 Nuxt creates Rspack compilers through Rsbuild internally, but its module API exposes the generated configuration through `rspack:config`; the Nuxt module installs the Rspack federation plugin at that hook. Browser builds enable `experiments.asyncStartup`; the server build uses synchronous startup so Nuxt can evaluate its SSR entry normally.
 
-Rspack remotes publish `remoteEntry.js`, `remoteEntry.ssr.js`, `mf-manifest.json`, and the server entry's portable chunk graph. The manifest includes `ssrRemoteEntry` and a `nuxtSsrBuildHash`, allowing hosts to load the server graph before hydration and detect later deployments.
+Rspack remotes publish `remoteEntry.js`, `remoteEntry.ssr.js`, and `mf-manifest.json` at `moduleFederation.base` (`/` by default), with the server entry's portable chunk graph under `app.buildAssetsDir`. The manifest includes `ssrRemoteEntry` and a `nuxtSsrBuildHash`, allowing hosts to load the server graph before hydration and detect later deployments.
 
 Nuxt's Rspack development middleware rejects cross-origin asset requests even when CORS headers are present. For cross-port local development, proxy the remote manifest and its configured `app.buildAssetsDir` through the host origin. The repository's `host-rspack` and `remote-rspack` examples provide a complete proxy setup. Production servers that allow cross-origin assets can use direct remote URLs.
 

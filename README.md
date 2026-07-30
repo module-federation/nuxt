@@ -126,14 +126,14 @@ export default defineNuxtConfig({
     config: {
       name: "host",
       remotes: {
-        remote: "remote@https://remote.example.com/_mf/mf-manifest.json",
+        remote: "remote@https://remote.example.com/mf-manifest.json",
       },
     },
   },
 });
 ```
 
-Rspack remotes publish `remoteEntry.js`, `remoteEntry.ssr.js`, manifest SSR metadata, and a portable server chunk graph under the configured `app.buildAssetsDir`. Hosts use the server entry before hydration and the browser entry afterward.
+Rspack remotes publish `remoteEntry.js`, `remoteEntry.ssr.js`, and the manifest at `moduleFederation.base` (`/` by default), with the portable server chunk graph under the configured `app.buildAssetsDir`. Hosts use the server entry before hydration and the browser entry afterward.
 
 Nuxt's Rspack development middleware accepts only same-origin asset requests. The dedicated Rspack host proxies the remote's manifest, entry, and chunks through `localhost:4175`; see [`apps/host-rspack/nuxt.config.ts`](apps/host-rspack/nuxt.config.ts). Deployed applications can use direct remote URLs when their production server permits cross-origin federation assets.
 
