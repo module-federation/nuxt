@@ -355,12 +355,19 @@ async function followSameOriginRedirects(entry: string, timeoutMs: number) {
     } finally {
       timeout?.clear();
     }
+    if (response.status >= 400) {
+      throw new Error(
+        `Manifest redirect probe failed with HTTP ${response.status}`,
+      );
+    }
     if (![301, 302, 303, 307, 308].includes(response.status)) {
       return current.href;
     }
 
     const location = response.headers.get("location");
-    if (!location) return current.href;
+    if (!location) {
+      throw new Error("Manifest redirect response did not include Location");
+    }
 
     const next = new URL(location, current);
     if (next.origin !== initial.origin) return entry;
