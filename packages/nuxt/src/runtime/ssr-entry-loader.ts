@@ -366,9 +366,7 @@ async function followSameOriginRedirects(entry: string, timeoutMs: number) {
 
     const location = response.headers.get("location");
     if (!location) {
-      throw new Error(
-        "Manifest redirect response did not include Location",
-      );
+      throw new Error("Manifest redirect response did not include Location");
     }
 
     const next = new URL(location, current);
