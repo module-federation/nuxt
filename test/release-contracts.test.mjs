@@ -20,6 +20,7 @@ import { createSsrOutputFingerprint } from "../packages/nuxt/src/server-output-f
 import { patchServerExposeResolver } from "../packages/nuxt/src/server-expose-resolver.ts";
 import { DEFAULT_BASE, normalizeBase } from "../packages/nuxt/src/options.ts";
 import { resolveBuildAssetUrl } from "../packages/nuxt/src/route-paths.ts";
+import { resolveRemoteComponents } from "../packages/nuxt/src/remotes.ts";
 import { repoRoot } from "./helpers/release.mjs";
 
 const nuxtPackageRequire = createRequire(
@@ -58,6 +59,96 @@ test("remote component exports remain valid and reject name collisions", () => {
       ]),
     /both normalize to the same Nuxt component/,
   );
+});
+
+test("manifest discovery can be disabled for explicitly configured components", async () => {
+  const originalFetch = globalThis.fetch;
+  let fetchCalls = 0;
+  globalThis.fetch = async () => {
+    fetchCalls += 1;
+    throw new Error("manifest fetch should be skipped");
+  };
+
+  try {
+    const result = await resolveRemoteComponents({
+      configured: { remote: ["Fallback"] },
+      discoverManifest: false,
+      remotes: {
+        remote: { entry: "http://remote.test/remoteEntry.js" },
+      },
+    });
+
+    assert.equal(fetchCalls, 0);
+    assert.deepEqual(
+      result.components.map(({ exposedName }) => exposedName),
+      ["Fallback"],
+    );
+    assert.deepEqual(result.remoteShared, { remote: [] });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("manifest discovery registers manifest exposes and shared metadata by default", async () => {
+  const originalFetch = globalThis.fetch;
+  const fetchedUrls = [];
+  globalThis.fetch = async (input) => {
+    fetchedUrls.push(String(input));
+    return new Response(
+      JSON.stringify({
+        exposes: [{ name: "./Widget" }],
+        shared: [{ name: "vue", version: "3.5.0", requiredVersion: "^3.5.0" }],
+      }),
+      { status: 200, headers: { "content-type": "application/json" } },
+    );
+  };
+
+  try {
+    const result = await resolveRemoteComponents({
+      configured: { remote: ["Fallback"] },
+      remotes: {
+        remote: { entry: "http://remote.test/remoteEntry.js" },
+      },
+    });
+
+    assert.deepEqual(fetchedUrls, ["http://remote.test/mf-manifest.json"]);
+    assert.deepEqual(
+      result.components.map(({ exposedName }) => exposedName),
+      ["Fallback", "Widget"],
+    );
+    assert.deepEqual(result.remoteShared, {
+      remote: [{ name: "vue", version: "3.5.0", requiredVersion: "^3.5.0" }],
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("manifest discovery keeps configured components when the fetch fails", async () => {
+  const originalFetch = globalThis.fetch;
+  let fetchCalls = 0;
+  globalThis.fetch = async () => {
+    fetchCalls += 1;
+    throw new Error("remote unavailable");
+  };
+
+  try {
+    const result = await resolveRemoteComponents({
+      configured: { remote: ["Fallback"] },
+      remotes: {
+        remote: { entry: "http://remote.test/remoteEntry.js" },
+      },
+    });
+
+    assert.equal(fetchCalls, 1);
+    assert.deepEqual(
+      result.components.map(({ exposedName }) => exposedName),
+      ["Fallback"],
+    );
+    assert.deepEqual(result.remoteShared, { remote: [] });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });
 
 test("remote component refs forward exposed object semantics", () => {

@@ -98,7 +98,7 @@ The exposed component is available through Nuxt's component auto-imports:
 </template>
 ```
 
-The module fetches each remote's `mf-manifest.json` during setup and registers valid component exposes. `remoteComponents` is the fallback list used when a manifest cannot be reached, including builds where the remote is deployed separately.
+The module fetches each remote's `mf-manifest.json` during setup and registers valid component exposes. `remoteComponents` is the fallback list used when a manifest cannot be reached, including builds where the remote is deployed separately. When `config.manifest` is `false`, the module does not fetch remote manifests during setup and registers only the exposes listed in `remoteComponents`.
 
 For SSR hosts, configure the remote with its manifest URL as shown above. The runtime then selects the browser or server entry from that manifest, preserves custom manifest paths, and can detect a new server build without restarting the host. Direct JavaScript entries remain supported when `mf-manifest.json` is adjacent; use the explicit manifest URL when entry and manifest directories differ.
 
@@ -199,7 +199,7 @@ Configure these values under `moduleFederation` in `nuxt.config.ts`.
 | `exposedDir`             | `string`                           | `"~/components/exposed"` | Directory whose Nuxt components are exposed automatically.                                             |
 | `manifestFetchTimeoutMs` | `number`                           | `500`                    | Maximum setup time for fetching each remote manifest.                                                  |
 | `manifestMetadata`       | `Record<string, unknown>`          | `{}`                     | Values merged into `metaData.custom` in generated manifest and stats files.                            |
-| `remoteComponents`       | `Record<string, string[]>`         | `{}`                     | Component exposes to register when manifest discovery is unavailable.                                  |
+| `remoteComponents`       | `Record<string, string[]>`         | `{}`                     | Component exposes to register when manifest discovery is unavailable or disabled.                      |
 | `ssr`                    | `boolean`                          | `true`                   | Render consumed remote components on the Nuxt server. Server exposes are still published when `false`. |
 | `ssrFetchTimeoutMs`      | `number`                           | `10000`                  | Maximum time for each SSR remote network request; `0` disables the timeout.                            |
 | `ssrManifestMaxAgeMs`    | `number`                           | `30000`                  | Interval before the server re-checks a remote manifest for a new release.                              |
@@ -218,7 +218,7 @@ The MF Vite config defaults are:
 }
 ```
 
-User values take precedence except for `config.target`. A single MF plugin serves both Nuxt environments, so the module always owns that setting and selects `web` for the client and `node` for the server build. Setting `config.manifest` to `false` disables manifest output, manifest-based component discovery, and automatic detection of new SSR builds; configure `remoteComponents` on every host and restart long-lived hosts after remote deployments in that case.
+User values take precedence except for `config.target`. A single MF plugin serves both Nuxt environments, so the module always owns that setting and selects `web` for the client and `node` for the server build. Setting `config.manifest` to `false` disables the app's manifest output, remote manifest-based component discovery, and automatic detection of new SSR builds; configure `remoteComponents` on every host and restart long-lived hosts after remote deployments in that case. Direct `remoteEntry.js` consumption remains supported.
 
 ## Verify an application
 

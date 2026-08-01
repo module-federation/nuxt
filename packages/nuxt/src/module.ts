@@ -32,6 +32,7 @@ const module: NuxtModule<ModuleOptions> = defineNuxtModule<ModuleOptions>({
         configured: options.remoteComponents,
         manifestFetchTimeoutMs: options.manifestFetchTimeoutMs,
         remotes: config.remotes,
+        discoverManifest: options.config?.manifest !== false,
       });
     const renderRemoteComponents =
       Boolean(nuxt.options.ssr) && options.ssr !== false;

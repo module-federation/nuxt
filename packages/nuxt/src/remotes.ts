@@ -1,15 +1,15 @@
 import type { ModuleFederationOptions } from "@module-federation/vite";
 import { addComponent, addTemplate, addTypeTemplate } from "@nuxt/kit";
-import { isJsonObject, parseJsonObject, readString } from "./json";
-import { DEFAULT_MANIFEST_FETCH_TIMEOUT_MS } from "./options";
+import { isJsonObject, parseJsonObject, readString } from "./json.ts";
+import { DEFAULT_MANIFEST_FETCH_TIMEOUT_MS } from "./options.ts";
 import {
   assertUniqueRemoteComponents,
   createRemoteComponent,
   createRemoteRefProxy,
   type RemoteComponent,
-} from "./remote-component-utils";
+} from "./remote-component-utils.ts";
 
-export type { RemoteComponent } from "./remote-component-utils";
+export type { RemoteComponent } from "./remote-component-utils.ts";
 
 type RemoteConfig = NonNullable<ModuleFederationOptions["remotes"]>[string];
 
@@ -21,6 +21,7 @@ export interface RemoteSharedInfo {
 
 export async function resolveRemoteComponents(options: {
   configured?: Record<string, string[]>;
+  discoverManifest?: boolean;
   manifestFetchTimeoutMs?: number;
   remotes?: ModuleFederationOptions["remotes"];
 }) {
@@ -30,10 +31,13 @@ export async function resolveRemoteComponents(options: {
 
   const components = await Promise.all(
     remoteNames.map(async (remoteName) => {
-      const manifest = await fetchRemoteManifest(
-        options.remotes?.[remoteName],
-        options.manifestFetchTimeoutMs,
-      );
+      const manifest =
+        options.discoverManifest === false
+          ? undefined
+          : await fetchRemoteManifest(
+              options.remotes?.[remoteName],
+              options.manifestFetchTimeoutMs,
+            );
       remoteShared[remoteName] = manifest ? readManifestShared(manifest) : [];
       const manifestComponents = manifest
         ? readManifestExposes(manifest)
