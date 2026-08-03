@@ -9,7 +9,13 @@
       "path": "./apps/host/tsconfig.json"
     },
     {
+      "path": "./apps/host-rspack/tsconfig.json"
+    },
+    {
       "path": "./apps/remote/tsconfig.json"
+    },
+    {
+      "path": "./apps/remote-rspack/tsconfig.json"
     }
   ]
 }

@@ -10,7 +10,7 @@ const nuxtDist = resolve(repoRoot, "packages/nuxt/dist");
 
 test("published declarations do not reference missing source maps", async () => {
   const declarations = (await readdir(nuxtDist)).filter((fileName) =>
-    fileName.endsWith(".d.mts"),
+    fileName.endsWith(".d.ts"),
   );
   assert.ok(declarations.length > 0, "build the Nuxt package before testing");
 

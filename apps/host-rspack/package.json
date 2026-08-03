@@ -1,0 +1,21 @@
+{
+  "name": "nuxt-host-rspack",
+  "type": "module",
+  "scripts": {
+    "build": "nuxt build",
+    "predev": "nuxt prepare",
+    "dev": "nuxt dev --port 4175",
+    "generate": "nuxt generate",
+    "preview": "nuxt preview --port 4175",
+    "typecheck": "nuxt typecheck"
+  },
+  "dependencies": {
+    "@module-federation/nuxt": "workspace:*",
+    "nuxt": "4.5.1",
+    "vue": "3.5.40",
+    "vue-router": "5.2.0"
+  },
+  "devDependencies": {
+    "@nuxt/rspack-builder": "4.5.1"
+  }
+}

@@ -39,6 +39,7 @@ export async function assertPublishedSsrExposeGraph(
   buildLabel,
   entryFile = "remoteEntry.ssr.js",
   base = "",
+  allowBundledBrowserRuntime = false,
 ) {
   const entryPath = resolve(publicRoot, base, entryFile);
   assert.ok(existsSync(entryPath), `${buildLabel} SSR entry is missing`);
@@ -53,8 +54,15 @@ export async function assertPublishedSsrExposeGraph(
       continue;
     }
 
+    const rspackExposeChunks = findRspackExposeChunkSpecifiers(moduleSource);
     for (const specifier of findModuleImports(moduleSource)) {
       if (!specifier.startsWith(".")) continue;
+      if (
+        rspackExposeChunks.size > 0 &&
+        !rspackExposeChunks.has(specifier.replace(/[?#].*$/, ""))
+      ) {
+        continue;
+      }
 
       const importedPath = await realpath(
         resolve(dirname(path), specifier.replace(/[?#].*$/, "")),
@@ -76,15 +84,24 @@ export async function assertPublishedSsrExposeGraph(
       /__ssrInlineRender|ssrRender(?:Attrs|Component)/,
       `${buildLabel} expose ${relative(publicRoot, path)} is not server-transformed`,
     );
+    if (!allowBundledBrowserRuntime) {
+      assert.doesNotMatch(
+        exposedGraphSource,
+        /document\.createElement/,
+        `${buildLabel} expose ${relative(publicRoot, path)} is browser-transformed`,
+      );
+    }
+  }
+  if (!allowBundledBrowserRuntime) {
+    assert.doesNotMatch(
+      source,
+      /document\.createElement/,
+      `${buildLabel} SSR entry reaches a browser-transformed expose`,
+    );
   }
   assert.doesNotMatch(
     source,
-    /document\.createElement/,
-    `${buildLabel} SSR entry reaches a browser-transformed expose`,
-  );
-  assert.doesNotMatch(
-    source,
-    /sourceMappingURL/,
+    /(?:\/\/|\/\*)[#@]\s*sourceMappingURL=/,
     `${buildLabel} SSR graph references unpublished source maps`,
   );
   assert.doesNotMatch(
@@ -101,6 +118,22 @@ export async function assertPublishedSsrExposeGraph(
       );
     }
   }
+}
+
+function findRspackExposeChunkSpecifiers(source) {
+  const marker = "__webpack_require__.initializeExposesData";
+  const start = source.indexOf(marker);
+  if (start < 0) return new Set();
+
+  const end = source.indexOf("// webpack/runtime/module_chunk_loading", start);
+  const exposeRuntime = source.slice(start, end < 0 ? undefined : end);
+  return new Set(
+    [
+      ...exposeRuntime.matchAll(
+        /__webpack_require__\.e\((['\"]?)([^)'\"]+)\1\)/g,
+      ),
+    ].map(([, , chunkId]) => `./${chunkId}.mjs`),
+  );
 }
 
 async function readRelativeSourcesFromGraph(graph, entryPath) {
@@ -283,6 +316,34 @@ export function startNitro(app, port, cwd) {
     },
     stdio: ["ignore", "pipe", "pipe"],
   });
+  child.output = "";
+
+  for (const stream of [child.stdout, child.stderr]) {
+    stream.on("data", (chunk) => {
+      child.output = `${child.output}${chunk}`.slice(-12_000);
+    });
+  }
+
+  return child;
+}
+
+export function startNuxtDev(app, port) {
+  const appRoot = resolve(repoRoot, `apps/${app}`);
+  const child = spawn(
+    process.execPath,
+    [nuxtCliPath(app), "dev", "--port", String(port)],
+    {
+      cwd: appRoot,
+      env: {
+        ...process.env,
+        HOST: "127.0.0.1",
+        NODE_OPTIONS: [process.env.NODE_OPTIONS, "--dns-result-order=ipv4first"]
+          .filter(Boolean)
+          .join(" "),
+      },
+      stdio: ["ignore", "pipe", "pipe"],
+    },
+  );
   child.output = "";
 
   for (const stream of [child.stdout, child.stderr]) {

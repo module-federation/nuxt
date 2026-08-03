@@ -3,6 +3,8 @@
   "compilerOptions": {
     "allowSyntheticDefaultImports": true,
     "allowImportingTsExtensions": true,
+    "declaration": true,
+    "declarationMap": true,
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
     "lib": ["ES2022", "DOM"],
@@ -18,6 +20,6 @@
     "types": ["node"],
     "verbatimModuleSyntax": true
   },
-  "include": ["federation.ts", "src/**/*.ts", "tsdown.config.ts"],
+  "include": ["federation.ts", "src/**/*.ts"],
   "exclude": ["dist", "node_modules"]
 }

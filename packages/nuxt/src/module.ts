@@ -20,6 +20,7 @@ const module: NuxtModule<ModuleOptions> = defineNuxtModule<ModuleOptions>({
   defaults: defaultModuleOptions,
   async setup(options) {
     const nuxt = useNuxt();
+    const rspack = isRspackBuilder(nuxt.options.builder);
     const publicBase = normalizeBase(options.base);
     const exposedDir = resolveExposedDir(nuxt, options.exposedDir);
     const exposed = registerExposedComponents(nuxt, exposedDir);
@@ -37,21 +38,37 @@ const module: NuxtModule<ModuleOptions> = defineNuxtModule<ModuleOptions>({
     const renderRemoteComponents =
       Boolean(nuxt.options.ssr) && options.ssr !== false;
 
-    warnOnSharedVersionMismatches(nuxt, config.shared, remoteShared);
+    if (!rspack) {
+      warnOnSharedVersionMismatches(nuxt, config.shared, remoteShared);
+    }
     registerRemoteEntryRoutes(nuxt, publicBase, options);
     registerRemoteComponents(remoteComponents, {
       hostName: config.name || "remote",
       server: renderRemoteComponents,
     });
     registerRemoteEntryAssetCopy(nuxt, publicBase, options);
-    await registerFederationPlugin(
-      { ...options, config },
-      exposed,
-      nuxt.options.rootDir,
-      { remoteSsr: renderRemoteComponents },
-    );
-    registerCorsPlugin();
+    if (rspack) {
+      const { registerRspackFederationPlugin } = await import("./rspack");
+      await registerRspackFederationPlugin(
+        { ...options, config },
+        exposed,
+        nuxt.options.rootDir,
+        { remoteSsr: renderRemoteComponents },
+      );
+    } else {
+      await registerFederationPlugin(
+        { ...options, config },
+        exposed,
+        nuxt.options.rootDir,
+        { remoteSsr: renderRemoteComponents },
+      );
+      registerCorsPlugin();
+    }
   },
 });
 
 export default module;
+
+function isRspackBuilder(builder: unknown) {
+  return builder === "rspack" || builder === "@nuxt/rspack-builder";
+}

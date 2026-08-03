@@ -2,12 +2,12 @@
   "name": "@module-federation/nuxt",
   "version": "0.1.0",
   "type": "module",
-  "description": "Nuxt module for Module Federation using @module-federation/vite",
+  "description": "Nuxt module for Module Federation using Vite or Rspack",
   "license": "MIT",
   "sideEffects": false,
   "main": "./dist/federation.mjs",
   "module": "./dist/federation.mjs",
-  "types": "./dist/federation.d.mts",
+  "types": "./dist/federation.d.ts",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/module-federation/nuxt.git",
@@ -24,17 +24,17 @@
   ],
   "exports": {
     ".": {
-      "types": "./dist/federation.d.mts",
+      "types": "./dist/federation.d.ts",
       "import": "./dist/federation.mjs",
       "default": "./dist/federation.mjs"
     },
     "./shared-strategy": {
-      "types": "./dist/shared-strategy.d.mts",
+      "types": "./dist/shared-strategy.d.ts",
       "import": "./dist/shared-strategy.mjs",
       "default": "./dist/shared-strategy.mjs"
     },
     "./ssr-entry-loader": {
-      "types": "./dist/ssr-entry-loader.d.mts",
+      "types": "./dist/ssr-entry-loader.d.ts",
       "import": "./dist/ssr-entry-loader.mjs",
       "default": "./dist/ssr-entry-loader.mjs"
     },
@@ -50,8 +50,8 @@
     "provenance": true
   },
   "scripts": {
-    "build": "tsdown",
-    "dev": "tsdown --watch --no-clean",
+    "build": "rslib build",
+    "dev": "rslib build --watch --no-clean",
     "pack:dry": "npm pack --dry-run",
     "prepack": "pnpm run build",
     "prepublishOnly": "pnpm run typecheck && pnpm run build",
@@ -61,18 +61,20 @@
     "node": "^22.18.0 || ^24.11.0 || >=26.0.0"
   },
   "dependencies": {
+    "@module-federation/enhanced": "2.8.1",
     "@module-federation/runtime": "2.8.1",
     "@module-federation/vite": "1.20.0",
     "@nuxt/kit": "^4.5.1",
-    "@nuxt/schema": "^4.5.1"
+    "@nuxt/schema": "^4.5.1",
+    "acorn": "8.15.0"
   },
   "peerDependencies": {
     "nuxt": ">=4.5.1"
   },
   "devDependencies": {
+    "@rslib/core": "0.23.2",
     "@types/node": "^26.1.2",
     "nuxt": "4.5.1",
-    "tsdown": "^0.22.14",
     "vue-tsc": "3.3.8"
   }
 }

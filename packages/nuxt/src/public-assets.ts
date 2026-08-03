@@ -52,10 +52,14 @@ export function registerRemoteEntryAssetCopy(
   // chunk imports must be rebased back to Nuxt's public build-assets directory.
   nuxt.hook("nitro:build:public-assets", (nitro) => {
     for (const file of remoteEntryFiles) {
-      const src = resolve(nitro.options.buildDir, `dist/client/${file}`);
+      const src = resolveClientAssetSource(
+        nitro.options.buildDir,
+        buildAssetsDir,
+        file,
+      );
       const dest = resolve(nitro.options.output.publicDir, outputBase, file);
 
-      if (existsSync(src)) {
+      if (src) {
         ensureParentDir(dest);
 
         if (file === remoteEntryFile) {
@@ -102,6 +106,20 @@ export function registerRemoteEntryAssetCopy(
       }
     }
   });
+}
+
+function resolveClientAssetSource(
+  buildDir: string,
+  buildAssetsDir: string,
+  file: string,
+) {
+  const clientDir = resolve(buildDir, "dist/client");
+  const candidates = [
+    resolve(clientDir, file),
+    ...(buildAssetsDir ? [resolve(clientDir, buildAssetsDir, file)] : []),
+  ];
+
+  return candidates.find(existsSync);
 }
 
 function copyOriginalRemoteEntryAsset(
