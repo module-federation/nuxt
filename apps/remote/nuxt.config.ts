@@ -15,6 +15,7 @@ export default defineNuxtConfig({
       filename: "remoteEntry.js",
       remotes: {},
       manifest: true,
+      moduleParseIdleTimeout: 30,
     },
   },
   vite: {
