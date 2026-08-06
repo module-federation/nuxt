@@ -66,6 +66,50 @@ test(
 );
 
 test(
+  "SSR remote loading validates import:false shared host dependencies",
+  { timeout: 45_000 },
+  async (context) => {
+    const fixtureRoot = await createNuxtFixture("host", {
+      moduleFederation: {
+        config: {
+          shared: {
+            "remote-provided-package": { import: false },
+          },
+        },
+      },
+    });
+    context.after(() => rm(fixtureRoot, { force: true, recursive: true }));
+
+    await assert.rejects(
+      runCommand(process.execPath, [nuxtCliPath("host"), "build", fixtureRoot]),
+      /Shared dependency "remote-provided-package" .*must be installed in the host application for SSR/,
+    );
+  },
+);
+
+test(
+  "SSR remote loading validates import:false shared host versions",
+  { timeout: 45_000 },
+  async (context) => {
+    const fixtureRoot = await createNuxtFixture("host", {
+      moduleFederation: {
+        config: {
+          shared: {
+            vue: { import: false, requiredVersion: "^99.0.0" },
+          },
+        },
+      },
+    });
+    context.after(() => rm(fixtureRoot, { force: true, recursive: true }));
+
+    await assert.rejects(
+      runCommand(process.execPath, [nuxtCliPath("host"), "build", fixtureRoot]),
+      /Shared dependency "vue" .*requires version "\^99\.0\.0".*host provides "3\.5\.40"/,
+    );
+  },
+);
+
+test(
   "client-only remote consumption still publishes server exposes",
   { timeout: 45_000 },
   async (context) => {

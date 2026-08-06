@@ -4,6 +4,8 @@ import { defineConfig } from "tsdown";
 const external = [
   ...builtinModules,
   ...builtinModules.map((moduleName) => `node:${moduleName}`),
+  "@module-federation/runtime",
+  "@module-federation/runtime/*",
   "@module-federation/vite",
   "@module-federation/vite/*",
   "@nuxt/kit",

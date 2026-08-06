@@ -1,4 +1,5 @@
 import type { ModuleFederationOptions } from "@module-federation/vite";
+import { satisfy } from "@module-federation/runtime/core";
 import { useLogger, type useNuxt } from "@nuxt/kit";
 import { existsSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
@@ -59,6 +60,50 @@ export function getLocallyProvidedSharedPackageNames(
       )
       .map(([packageName]) => packageName),
   );
+}
+
+export function getImportFalseSharedPackageNames(
+  shared: ModuleFederationOptions["shared"] | undefined,
+) {
+  if (!isJsonObject(shared)) return new Set<string>();
+
+  return new Set(
+    Object.entries(shared)
+      .filter(([, config]) => isJsonObject(config) && config.import === false)
+      .map(([packageName]) => packageName),
+  );
+}
+
+/**
+ * `import: false` keeps a package out of the local federation bundle, but an
+ * SSR remote still evaluates its bare import in the host process. Validate
+ * that the host can provide that dependency before the server starts.
+ */
+export function validateImportFalseSharedPackages(
+  rootDir: string,
+  shared: ModuleFederationOptions["shared"] | undefined,
+) {
+  if (!isJsonObject(shared)) return;
+
+  for (const [packageName, config] of Object.entries(shared)) {
+    if (!isJsonObject(config) || config.import !== false) continue;
+
+    const installedVersion = readInstalledPackageVersion(rootDir, packageName);
+    if (!installedVersion) {
+      throw new Error(
+        `[module-federation] Shared dependency "${packageName}" is configured with import:false and must be installed in the host application for SSR. Install it in ${rootDir}.`,
+      );
+    }
+
+    const requiredVersion = readString(config, "requiredVersion");
+    if (!requiredVersion) continue;
+
+    if (!satisfy(installedVersion, requiredVersion)) {
+      throw new Error(
+        `[module-federation] Shared dependency "${packageName}" is configured with import:false and requires version "${requiredVersion}", but the host provides "${installedVersion}".`,
+      );
+    }
+  }
 }
 
 /**
