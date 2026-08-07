@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
+import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import test from "node:test";
 import { isMfRemoteEntryImporter } from "../packages/nuxt/src/runtime-plugin-importer.ts";
@@ -21,6 +22,10 @@ import { patchServerExposeResolver } from "../packages/nuxt/src/server-expose-re
 import { DEFAULT_BASE, normalizeBase } from "../packages/nuxt/src/options.ts";
 import { resolveBuildAssetUrl } from "../packages/nuxt/src/route-paths.ts";
 import { resolveRemoteComponents } from "../packages/nuxt/src/remotes.ts";
+import {
+  getImportFalseSharedPackageNames,
+  validateImportFalseSharedPackages,
+} from "../packages/nuxt/src/shared.ts";
 import { repoRoot } from "./helpers/release.mjs";
 
 const nuxtPackageRequire = createRequire(
@@ -241,6 +246,69 @@ test("SSR dependencies stay separate from rewritten runtime packages", () => {
     ["@module-federation/sdk"],
     "shared runtime support must retain bare ESM import semantics",
   );
+});
+
+test("import:false shared packages remain explicit SSR host requirements", () => {
+  assert.deepEqual(
+    [
+      ...getImportFalseSharedPackageNames({
+        "host-provided": { import: false },
+        local: { singleton: true },
+      }),
+    ],
+    ["host-provided"],
+  );
+});
+
+test("import:false shared packages fail setup when the host cannot provide them", () => {
+  assert.throws(
+    () =>
+      validateImportFalseSharedPackages(repoRoot, {
+        "missing-host-package": { import: false },
+      }),
+    /Shared dependency "missing-host-package" .*must be installed in the host application for SSR/,
+  );
+});
+
+test("import:false shared packages enforce requiredVersion", async () => {
+  const fixtureRoot = await mkdtemp(resolve(repoRoot, ".nuxt-mf-shared-"));
+  const packageRoot = resolve(fixtureRoot, "node_modules/host-provided");
+
+  try {
+    await mkdir(packageRoot, { recursive: true });
+    await writeFile(resolve(fixtureRoot, "package.json"), "{}\n");
+    await writeFile(
+      resolve(packageRoot, "package.json"),
+      JSON.stringify({
+        name: "host-provided",
+        version: "2.0.0",
+        exports: "./index.js",
+      }),
+    );
+    await writeFile(resolve(packageRoot, "index.js"), "export default {}\n");
+
+    assert.doesNotThrow(() =>
+      validateImportFalseSharedPackages(fixtureRoot, {
+        "host-provided": {
+          import: false,
+          requiredVersion: "^2.0.0",
+        },
+      }),
+    );
+
+    assert.throws(
+      () =>
+        validateImportFalseSharedPackages(fixtureRoot, {
+          "host-provided": {
+            import: false,
+            requiredVersion: "^1.0.0",
+          },
+        }),
+      /requires version "\^1\.0\.0", but the host provides "2\.0\.0"/,
+    );
+  } finally {
+    await rm(fixtureRoot, { force: true, recursive: true });
+  }
 });
 
 test("portable SSR loader rejects app-local absolute shared mappings", () => {

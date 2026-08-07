@@ -1,4 +1,5 @@
 import type { ModuleFederationOptions } from "@module-federation/vite";
+import { satisfy } from "@module-federation/runtime/core";
 import { useLogger, type useNuxt } from "@nuxt/kit";
 import { existsSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
@@ -8,7 +9,7 @@ import {
   parseJsonObject,
   readString,
   readStringRecord,
-} from "./json";
+} from "./json.ts";
 import type { RemoteSharedInfo } from "./remotes";
 
 type Nuxt = ReturnType<typeof useNuxt>;
@@ -59,6 +60,50 @@ export function getLocallyProvidedSharedPackageNames(
       )
       .map(([packageName]) => packageName),
   );
+}
+
+export function getImportFalseSharedPackageNames(
+  shared: ModuleFederationOptions["shared"] | undefined,
+) {
+  if (!isJsonObject(shared)) return new Set<string>();
+
+  return new Set(
+    Object.entries(shared)
+      .filter(([, config]) => isJsonObject(config) && config.import === false)
+      .map(([packageName]) => packageName),
+  );
+}
+
+/**
+ * `import: false` keeps a package out of the local federation bundle, but an
+ * SSR remote still evaluates its bare import in the host process. Validate
+ * that the host can provide that dependency before the server starts.
+ */
+export function validateImportFalseSharedPackages(
+  rootDir: string,
+  shared: ModuleFederationOptions["shared"] | undefined,
+) {
+  if (!isJsonObject(shared)) return;
+
+  for (const [packageName, config] of Object.entries(shared)) {
+    if (!isJsonObject(config) || config.import !== false) continue;
+
+    const installedVersion = readInstalledPackageVersion(rootDir, packageName);
+    if (!installedVersion) {
+      throw new Error(
+        `[module-federation] Shared dependency "${packageName}" is configured with import:false and must be installed in the host application for SSR. Install it in ${rootDir}.`,
+      );
+    }
+
+    const requiredVersion = readString(config, "requiredVersion");
+    if (!requiredVersion) continue;
+
+    if (!satisfy(installedVersion, requiredVersion)) {
+      throw new Error(
+        `[module-federation] Shared dependency "${packageName}" is configured with import:false and requires version "${requiredVersion}", but the host provides "${installedVersion}".`,
+      );
+    }
+  }
 }
 
 /**
@@ -115,15 +160,33 @@ export function readInstalledPackageVersion(
   rootDir: string,
   packageName: string,
 ) {
-  try {
-    const require = createRequire(resolve(rootDir, "package.json"));
-    const packageJsonPath = require.resolve(`${packageName}/package.json`);
-    const packageJson = parseJsonObject(readFileSync(packageJsonPath, "utf8"));
+  const require = createRequire(resolve(rootDir, "package.json"));
+  const packageJsonPaths: string[] = [];
 
-    return packageJson ? readString(packageJson, "version") : undefined;
+  try {
+    packageJsonPaths.push(require.resolve(`${packageName}/package.json`));
   } catch {
-    return undefined;
+    // Some packages intentionally hide package.json through `exports`.
   }
+
+  for (const searchPath of require.resolve.paths(packageName) || []) {
+    packageJsonPaths.push(resolve(searchPath, packageName, "package.json"));
+  }
+
+  for (const packageJsonPath of new Set(packageJsonPaths)) {
+    try {
+      const packageJson = parseJsonObject(
+        readFileSync(packageJsonPath, "utf8"),
+      );
+
+      const version = packageJson && readString(packageJson, "version");
+      if (version) return version;
+    } catch {
+      // Keep searching the normal Node module-resolution paths.
+    }
+  }
+
+  return undefined;
 }
 
 function readDeclaredPackageVersion(rootDir: string, packageName: string) {

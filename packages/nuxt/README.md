@@ -163,6 +163,8 @@ export default defineNuxtConfig({
 
 During setup, the module compares manifest-provided shared versions with the host's installed versions. Major-version differences produce a warning because the server uses the host's copy without runtime version negotiation.
 
+When a shared dependency uses `import: false`, it is not bundled as a local federation provider, but SSR remote loading still evaluates its bare import in the host process. The host must install that dependency; when `requiredVersion` is set, setup validates the installed version and fails with the package name before remote loading begins. The dependency is also included in Nitro's standalone trace.
+
 Server exposes bundle their non-shared npm dependencies into the published SSR graph, so a remote-only package does not need to be installed by every host. `config.ssrExternals` opts packages out of that bundling. Every consuming host must install those explicit externals at a compatible version and list them in its own `config.ssrExternals` so Nitro includes them in standalone output. The SSR loader keeps these imports as bare specifiers, preserving each package's ESM `import` export condition. Prefer `config.shared` for framework runtimes and other singleton dependencies.
 
 Advanced `@module-federation/vite/ssrEntryLoader` `resolvedShared` mappings must point to absolute files inside named, installed packages. The module stores them as package-relative descriptors so standalone output does not retain build-machine paths; app-local file mappings fail during setup with an actionable error.

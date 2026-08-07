@@ -11,8 +11,10 @@ import { isMfRemoteEntryImporter } from "./runtime-plugin-importer";
 import { publishServerExposes } from "./server-exposes";
 import { registerServerSharedExternals } from "./server-shared-externals";
 import {
+  getImportFalseSharedPackageNames,
   getLocallyProvidedSharedPackageNames,
   getSharedPackageNames,
+  validateImportFalseSharedPackages,
 } from "./shared";
 import {
   createPortableResolvedShared,
@@ -59,7 +61,11 @@ export async function registerFederationPlugin(
 ) {
   const enableSsrRemoteLoader =
     ssrOptions.remoteSsr !== false && hasRemotes(options.config || {});
-  const ssrShared = await resolveSsrShared(options, rootDir);
+  const ssrShared = await resolveSsrShared(
+    options,
+    rootDir,
+    enableSsrRemoteLoader,
+  );
   const portableResolvedShared = enableSsrRemoteLoader
     ? createPortableResolvedShared(
         getConfiguredResolvedShared(options.config),
@@ -339,11 +345,21 @@ function normalizeExposeImportPath(importPath: string, rootDir: string) {
   return resolve(rootDir, importPath);
 }
 
-async function resolveSsrShared(options: ModuleOptions, rootDir: string) {
+async function resolveSsrShared(
+  options: ModuleOptions,
+  rootDir: string,
+  enableSsrRemoteLoader: boolean,
+) {
   const sharedPackages = getSharedPackageNames(options.config?.shared);
   const locallyProvidedSharedPackages = getLocallyProvidedSharedPackageNames(
     options.config?.shared,
   );
+  const importFalseSharedPackages = getImportFalseSharedPackageNames(
+    options.config?.shared,
+  );
+  if (enableSsrRemoteLoader) {
+    validateImportFalseSharedPackages(rootDir, options.config?.shared);
+  }
   const configuredSsrExternals = (options.config?.ssrExternals || []).filter(
     isString,
   );
@@ -373,6 +389,7 @@ async function resolveSsrShared(options: ModuleOptions, rootDir: string) {
     ...new Set([
       ...COMMON_SSR_SHARED_PACKAGES,
       ...locallyProvidedSharedPackages,
+      ...(enableSsrRemoteLoader ? [...importFalseSharedPackages] : []),
       ...esmExternals,
       ...configuredSsrExternals,
     ]),
