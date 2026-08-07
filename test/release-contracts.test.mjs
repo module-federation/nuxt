@@ -279,7 +279,21 @@ test("import:false shared packages enforce requiredVersion", async () => {
     await writeFile(resolve(fixtureRoot, "package.json"), "{}\n");
     await writeFile(
       resolve(packageRoot, "package.json"),
-      JSON.stringify({ name: "host-provided", version: "2.0.0" }),
+      JSON.stringify({
+        name: "host-provided",
+        version: "2.0.0",
+        exports: "./index.js",
+      }),
+    );
+    await writeFile(resolve(packageRoot, "index.js"), "export default {}\n");
+
+    assert.doesNotThrow(() =>
+      validateImportFalseSharedPackages(fixtureRoot, {
+        "host-provided": {
+          import: false,
+          requiredVersion: "^2.0.0",
+        },
+      }),
     );
 
     assert.throws(

@@ -9,7 +9,7 @@ import {
   parseJsonObject,
   readString,
   readStringRecord,
-} from "./json";
+} from "./json.ts";
 import type { RemoteSharedInfo } from "./remotes";
 
 type Nuxt = ReturnType<typeof useNuxt>;
@@ -160,15 +160,33 @@ export function readInstalledPackageVersion(
   rootDir: string,
   packageName: string,
 ) {
-  try {
-    const require = createRequire(resolve(rootDir, "package.json"));
-    const packageJsonPath = require.resolve(`${packageName}/package.json`);
-    const packageJson = parseJsonObject(readFileSync(packageJsonPath, "utf8"));
+  const require = createRequire(resolve(rootDir, "package.json"));
+  const packageJsonPaths: string[] = [];
 
-    return packageJson ? readString(packageJson, "version") : undefined;
+  try {
+    packageJsonPaths.push(require.resolve(`${packageName}/package.json`));
   } catch {
-    return undefined;
+    // Some packages intentionally hide package.json through `exports`.
   }
+
+  for (const searchPath of require.resolve.paths(packageName) || []) {
+    packageJsonPaths.push(resolve(searchPath, packageName, "package.json"));
+  }
+
+  for (const packageJsonPath of new Set(packageJsonPaths)) {
+    try {
+      const packageJson = parseJsonObject(
+        readFileSync(packageJsonPath, "utf8"),
+      );
+
+      const version = packageJson && readString(packageJson, "version");
+      if (version) return version;
+    } catch {
+      // Keep searching the normal Node module-resolution paths.
+    }
+  }
+
+  return undefined;
 }
 
 function readDeclaredPackageVersion(rootDir: string, packageName: string) {
