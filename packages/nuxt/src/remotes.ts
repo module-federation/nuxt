@@ -211,30 +211,18 @@ export function registerRemoteComponents(
     addTypeTemplate({
       filename: "types/module-federation-components.d.ts",
       getContents() {
-        return `
-          import type { Component } from "vue";
+        return `declare module "vue" {
+  export interface GlobalComponents {
+    ${components
+      .map(
+        (component) =>
+          `${component.componentName}: typeof import("../../../${component.remoteName}/.nuxt/components.d.ts")["${component.exposedName}"];`,
+      )
+      .join("\n\t\t")}
+  }
+}
 
-          ${components
-            .map(
-              (component) => `
-                declare module ${JSON.stringify(component.importPath)} {
-                  const component: Component;
-                  export default component;
-                }
-              `,
-            )
-            .join("\n")}
-
-          declare module "vue" {
-            export interface GlobalComponents {
-              ${components
-                .map((component) => `${component.componentName}: Component;`)
-                .join("\n")}
-            }
-          }
-
-          export {};
-        `;
+export { };`;
       },
     });
   }

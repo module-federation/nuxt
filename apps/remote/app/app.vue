@@ -1,3 +1,3 @@
 <template>
-  <Widget />
+  <Widget message="Remote Hello" />
 </template>

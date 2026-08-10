@@ -1,4 +1,10 @@
 <script setup lang="ts">
+interface Props {
+  message: string;
+}
+
+defineProps<Props>();
+
 const count = ref(0);
 const hydrated = ref(false);
 
@@ -22,6 +28,7 @@ onMounted(() => {
     "
     data-e2e="APP__CARD"
   >
+    <h1>Message: {{ message }}</h1>
     <div class="icon">
       <svg
         enable-background="new 0 0 512 512"

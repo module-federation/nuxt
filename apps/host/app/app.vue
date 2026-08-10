@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import HostCard from "./components/HostCard.vue";
 import HostSsrComponent from "./components/HostSsrComponent.vue";
+
+const message = "Hello World";
 </script>
 
 <template>
@@ -11,13 +13,15 @@ import HostSsrComponent from "./components/HostSsrComponent.vue";
     <div class="component-grid">
       <HostSsrComponent />
       <Suspense>
-        <RemoteWidget />
+        <RemoteWidget :message />
         <template #fallback>
           <div>Loading remote widget...</div>
         </template>
       </Suspense>
       <Suspense>
-        <RemoteCounter />
+        <RemoteCounter>
+          <template #footer> Slot from host </template>
+        </RemoteCounter>
         <template #fallback>
           <div>Loading remote counter...</div>
         </template>
