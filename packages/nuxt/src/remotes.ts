@@ -208,24 +208,38 @@ export function registerRemoteComponents(
       });
     }
 
+    // Nuxt types `#components` and `GlobalComponents` from these exports.
     addTypeTemplate({
-      filename: "types/module-federation-components.d.ts",
-      getContents() {
-        return `declare module "vue" {
-  export interface GlobalComponents {
-    ${components
-      .map(
-        (component) =>
-          `${component.componentName}: typeof import("../../../${component.remoteName}/.nuxt/components.d.ts")["${component.exposedName}"];`,
-      )
-      .join("\n\t\t")}
+      filename: "remote-components.d.ts",
+      getContents: () => renderRemoteComponentTypes(components),
+    });
+    addTypeTemplate({
+      filename: "types/module-federation-remotes.d.ts",
+      getContents: () => renderRemoteModuleFallbackTypes(components),
+    });
   }
 }
 
-export { };`;
-      },
-    });
-  }
+export function renderRemoteComponentTypes(components: RemoteComponent[]) {
+  return `${components
+    .map(
+      (component) =>
+        `export declare const ${component.exportName}: typeof import(${JSON.stringify(component.importPath)})["default"];`,
+    )
+    .join("\n")}\n`;
+}
+
+// Wildcard declarations only apply when a remote has no resolvable types, so
+// types downloaded by MF dts into the tsconfig paths take precedence.
+export function renderRemoteModuleFallbackTypes(components: RemoteComponent[]) {
+  return `${[...new Set(components.map((component) => component.remoteName))]
+    .map(
+      (remoteName) => `declare module ${JSON.stringify(`${remoteName}/*`)} {
+  const component: import("vue").Component;
+  export default component;
+}`,
+    )
+    .join("\n\n")}\n`;
 }
 
 async function fetchRemoteManifest(

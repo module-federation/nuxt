@@ -15,6 +15,7 @@ export default defineNuxtConfig({
       filename: "remoteEntry.js",
       remotes: {},
       manifest: true,
+      dts: true,
     },
   },
   vite: {

@@ -1,5 +1,6 @@
 import { defineNuxtModule, useNuxt } from "@nuxt/kit";
 import type { NuxtModule } from "@nuxt/schema";
+import { registerDtsTemplates } from "./dts";
 import { registerExposedComponents, resolveExposedDir } from "./exposes";
 import {
   defaultModuleOptions,
@@ -43,6 +44,7 @@ const module: NuxtModule<ModuleOptions> = defineNuxtModule<ModuleOptions>({
       hostName: config.name || "remote",
       server: renderRemoteComponents,
     });
+    registerDtsTemplates(nuxt, config.dts, Object.keys(config.remotes || {}));
     registerRemoteEntryAssetCopy(nuxt, publicBase, options);
     await registerFederationPlugin(
       { ...options, config },

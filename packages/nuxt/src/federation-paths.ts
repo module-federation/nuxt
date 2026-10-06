@@ -1,4 +1,5 @@
 import { posix } from "node:path";
+import { resolveGeneratedTypesFileNames } from "./dts";
 import type { ModuleOptions } from "./options";
 
 export function resolveRemoteEntryFileName(options: ModuleOptions) {
@@ -26,6 +27,8 @@ export function resolveFederationAssetFileNames(options: ModuleOptions) {
   if (options.config?.manifest !== false) {
     files.push(resolveManifestFileName(options));
   }
+
+  files.push(...resolveGeneratedTypesFileNames(options.config?.dts));
 
   return files;
 }

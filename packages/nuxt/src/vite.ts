@@ -4,6 +4,7 @@ import { existsSync } from "node:fs";
 import { createRequire, isBuiltin } from "node:module";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { resolveNuxtDtsOptions } from "./dts";
 import { getStatsFileName, resolveManifestFileName } from "./federation-paths";
 import { isJsonObject, parseJsonObject } from "./json";
 import type { ModuleOptions } from "./options";
@@ -297,7 +298,6 @@ function createFederationConfig(
   };
 
   return {
-    dts: false,
     name: "remote",
     filename: "remoteEntry.js",
     manifest: resolveManifestOptions(options),
@@ -307,6 +307,7 @@ function createFederationConfig(
       ? { publicPath: "auto" }
       : {}),
     ...options.config,
+    dts: resolveNuxtDtsOptions(options.config?.dts, useNuxt().options),
     exposes,
   };
 }

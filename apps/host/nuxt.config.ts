@@ -16,6 +16,7 @@ export default defineNuxtConfig({
     config: {
       name: "host",
       hostInitInjectLocation: "entry",
+      dts: { generateTypes: false },
       remotes: {
         remote: {
           type: "module",

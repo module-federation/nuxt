@@ -110,6 +110,37 @@ With multiple configured remotes, the remote name is included to prevent collisi
 
 Only expose names beginning with a letter and containing letters, numbers, underscores, or hyphens are registered as Nuxt components. Other MF exposes remain available through normal runtime imports.
 
+### Component types
+
+Remote components are typed as Vue's generic `Component` by default. To type their props, emits, and slots from the remote source, enable MF type generation with `config.dts`:
+
+```ts
+// Remote
+moduleFederation: {
+  config: {
+    name: "catalog",
+    dts: true,
+  },
+},
+
+// Host
+moduleFederation: {
+  config: {
+    name: "shell",
+    dts: { generateTypes: false },
+    remotes: {
+      /* ... */
+    },
+  },
+},
+```
+
+The remote publishes `@mf-types.zip` and `@mf-types.d.ts` next to its manifest. Its declarations are generated with `vue-tsc` when it is installed, using a tsconfig that extends Nuxt's `tsconfig.app.json`.
+
+The host downloads those types into `<rootDir>/@mf-types` when the dev server starts, and resolves `RemoteProductCard`, `#components`, and `import("catalog/ProductCard")` from them. Builds only download types when `consumeTypes.typesOnBuild` is `true`, which requires the remote to be reachable at build time. Without downloaded types, remote modules fall back to `Component`, so type checks do not depend on a running remote. Add `@mf-types` to `.gitignore`.
+
+Relative `dts` paths such as `tsConfigPath`, `cwd`, and `consumeTypes.typesFolder` resolve from the Nuxt application root.
+
 ## Server rendering
 
 `ssr` defaults to `true`. When Nuxt SSR is enabled, the module creates client and server federation builds:
@@ -214,7 +245,7 @@ The MF Vite config defaults are:
   name: "remote",
   filename: "remoteEntry.js",
   manifest: { fileName: "mf-manifest.json" },
-  dts: false,
+  dts: false, // see "Component types"
   remotes: {},
   exposes: {},
 }

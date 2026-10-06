@@ -21,7 +21,15 @@ import { createSsrOutputFingerprint } from "../packages/nuxt/src/server-output-f
 import { patchServerExposeResolver } from "../packages/nuxt/src/server-expose-resolver.ts";
 import { DEFAULT_BASE, normalizeBase } from "../packages/nuxt/src/options.ts";
 import { resolveBuildAssetUrl } from "../packages/nuxt/src/route-paths.ts";
-import { resolveRemoteComponents } from "../packages/nuxt/src/remotes.ts";
+import {
+  renderRemoteComponentTypes,
+  renderRemoteModuleFallbackTypes,
+  resolveRemoteComponents,
+} from "../packages/nuxt/src/remotes.ts";
+import {
+  resolveGeneratedTypesFileNames,
+  resolveNuxtDtsOptions,
+} from "../packages/nuxt/src/dts.ts";
 import {
   getImportFalseSharedPackageNames,
   validateImportFalseSharedPackages,
@@ -176,6 +184,132 @@ test("remote component refs forward exposed object semantics", () => {
   );
   facade.count = 2;
   assert.equal(remote.count, 2);
+});
+
+test("dts stays disabled unless configured", () => {
+  const paths = {
+    buildDir: "/app/.nuxt",
+    rootDir: "/app",
+    srcDir: "/app/app",
+  };
+
+  assert.equal(resolveNuxtDtsOptions(undefined, paths, true), false);
+  assert.equal(resolveNuxtDtsOptions(false, paths, true), false);
+  assert.deepEqual(resolveGeneratedTypesFileNames(undefined), []);
+  assert.deepEqual(
+    resolveGeneratedTypesFileNames({ generateTypes: false }),
+    [],
+  );
+});
+
+test("dts defaults resolve against the Nuxt root instead of srcDir", () => {
+  const paths = {
+    buildDir: "/app/.nuxt",
+    rootDir: "/app",
+    srcDir: "/app/app",
+  };
+
+  assert.deepEqual(resolveNuxtDtsOptions(true, paths, true), {
+    cwd: "/app",
+    generateTypes: {
+      compilerInstance: "vue-tsc",
+      tsConfigPath: "/app/.nuxt/tsconfig.mf-types.json",
+    },
+    consumeTypes: { typesFolder: "../@mf-types" },
+  });
+  assert.deepEqual(
+    resolveNuxtDtsOptions(
+      {
+        tsConfigPath: "./tsconfig.types.json",
+        generateTypes: { compilerInstance: "tsc", typesFolder: "types" },
+        consumeTypes: { typesFolder: "generated/mf", typesOnBuild: true },
+      },
+      paths,
+      true,
+    ),
+    {
+      tsConfigPath: "./tsconfig.types.json",
+      cwd: "/app",
+      generateTypes: {
+        compilerInstance: "tsc",
+        typesFolder: "types",
+        tsConfigPath: "/app/tsconfig.types.json",
+      },
+      consumeTypes: { typesFolder: "../generated/mf", typesOnBuild: true },
+    },
+  );
+  assert.deepEqual(
+    resolveNuxtDtsOptions({ consumeTypes: false }, paths, false).generateTypes,
+    { tsConfigPath: "/app/.nuxt/tsconfig.mf-types.json" },
+  );
+  assert.deepEqual(
+    resolveGeneratedTypesFileNames({ generateTypes: { typesFolder: "types" } }),
+    ["types.zip", "types.d.ts"],
+  );
+});
+
+test("downloaded remote types take precedence over component fallbacks", async () => {
+  const ts = nuxtPackageRequire("typescript");
+  const dir = await mkdtemp(resolve(repoRoot, ".nuxt-mf-dts-"));
+  const components = [
+    createRemoteComponent("remote", "Widget", 1),
+    createRemoteComponent("remote", "Counter", 1),
+  ];
+
+  try {
+    await mkdir(resolve(dir, "@mf-types/remote"), { recursive: true });
+    await writeFile(
+      resolve(dir, "vue.d.ts"),
+      "export type Component = { fallback: true };\n",
+    );
+    await writeFile(
+      resolve(dir, "@mf-types/remote/Widget.d.ts"),
+      "declare const widget: { typed: true };\nexport default widget;\n",
+    );
+    await writeFile(
+      resolve(dir, "remote-components.d.ts"),
+      renderRemoteComponentTypes(components),
+    );
+    await writeFile(
+      resolve(dir, "fallbacks.d.ts"),
+      renderRemoteModuleFallbackTypes(components),
+    );
+    await writeFile(
+      resolve(dir, "usage.ts"),
+      [
+        'import { mfRemoteRemote_Counter, mfRemoteRemote_Widget } from "./remote-components";',
+        "const widget: { typed: true } = mfRemoteRemote_Widget;",
+        "const counter: { fallback: true } = mfRemoteRemote_Counter;",
+        "export { counter, widget };",
+      ].join("\n"),
+    );
+
+    const program = ts.createProgram(
+      ["usage.ts", "fallbacks.d.ts"].map((file) => resolve(dir, file)),
+      {
+        module: ts.ModuleKind.Preserve,
+        moduleResolution: ts.ModuleResolutionKind.Bundler,
+        noEmit: true,
+        paths: {
+          "remote/*": [resolve(dir, "@mf-types/remote/*")],
+          vue: [resolve(dir, "vue.d.ts")],
+        },
+        strict: true,
+        typeRoots: [],
+      },
+    );
+
+    assert.deepEqual(
+      ts
+        .getPreEmitDiagnostics(program)
+        .map((diagnostic) =>
+          ts.flattenDiagnosticMessageText(diagnostic.messageText, "\n"),
+        ),
+      [],
+    );
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
 });
 
 test("SSR loader aliases only generated federation runtime imports", () => {
