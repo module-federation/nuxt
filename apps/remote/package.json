@@ -10,6 +10,7 @@
     "typecheck": "nuxt typecheck"
   },
   "dependencies": {
+    "@module-federation/bridge-vue3": "^2.8.2",
     "@module-federation/nuxt": "workspace:*",
     "nuxt": "4.5.1",
     "ufo": "1.6.4",

@@ -26,3 +26,28 @@ test("host and SSR remote hydrate", async ({ page }) => {
     page.getByRole("button", { name: /Remote counter: 1/ }),
   ).toHaveCount(2);
 });
+
+test("Bridge remote app keeps its basename while navigating", async ({
+  page,
+}) => {
+  await page.goto("/bridge");
+
+  await expect(
+    page.getByRole("heading", { name: "Bridge remote app" }),
+  ).toBeVisible();
+  await expect(page.getByText("Bridge home route.")).toBeVisible();
+
+  await page.getByRole("link", { name: "Detail", exact: true }).click();
+  await expect(page).toHaveURL(/\/bridge\/detail$/);
+  await expect(page.getByText(/Bridge detail route/)).toBeVisible();
+
+  await page.goto("/bridge/detail");
+  await expect(page.getByText(/Bridge detail route/)).toBeVisible();
+
+  await page.getByRole("link", { name: "Home", exact: true }).click();
+  await expect(page).toHaveURL(/\/bridge\/?$/);
+  await expect(page.getByText("Bridge home route.")).toBeVisible();
+
+  await page.getByRole("link", { name: "Components", exact: true }).click();
+  await expect(page).toHaveURL(/\/$/);
+});

@@ -1,33 +1,15 @@
-<script setup lang="ts">
-import HostCard from "./components/HostCard.vue";
-import HostSsrComponent from "./components/HostSsrComponent.vue";
-
-const message = "Hello World";
-</script>
-
 <template>
-  <main class="examples">
-    <div class="host-column">
-      <HostCard />
-    </div>
-    <div class="component-grid">
-      <HostSsrComponent />
-      <Suspense>
-        <RemoteWidget :message />
-        <template #fallback>
-          <div>Loading remote widget...</div>
-        </template>
-      </Suspense>
-      <Suspense>
-        <RemoteCounter>
-          <template #footer> Slot from host </template>
-        </RemoteCounter>
-        <template #fallback>
-          <div>Loading remote counter...</div>
-        </template>
-      </Suspense>
-    </div>
-  </main>
+  <div class="shell">
+    <header>
+      <strong>Nuxt MF host</strong>
+      <nav>
+        <NuxtLink to="/">Components</NuxtLink>
+        <NuxtLink to="/bridge">Bridge app</NuxtLink>
+        <NuxtLink to="/bridge/detail">Bridge detail</NuxtLink>
+      </nav>
+    </header>
+    <NuxtPage />
+  </div>
 </template>
 
 <style>
@@ -35,17 +17,23 @@ body {
   margin: 0;
   font-family: sans-serif;
 }
-
-.examples {
-  display: block;
-}
-
-.host-column {
-  float: left;
-}
-
-.component-grid {
+.shell header {
   display: flex;
+  gap: 1.25rem;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid #e2e8f0;
+}
+.shell nav {
+  display: flex;
+  gap: 0.75rem;
   flex-wrap: wrap;
+}
+.shell a {
+  color: #2563eb;
+  text-decoration: none;
+}
+.shell a.router-link-active {
+  font-weight: 600;
 }
 </style>

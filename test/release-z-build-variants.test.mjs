@@ -34,6 +34,40 @@ test(
 );
 
 test(
+  "isolated Nuxt fixtures resolve root-relative configured exposes",
+  { timeout: 90_000 },
+  async (context) => {
+    const fixtureRoot = await createNuxtFixture("remote");
+    context.after(() => rm(fixtureRoot, { force: true, recursive: true }));
+
+    assert.ok(
+      existsSync(resolve(fixtureRoot, "app/export-app.ts")),
+      "fixture does not contain the app source used by config.exposes",
+    );
+    await runCommand(process.execPath, [
+      nuxtCliPath("remote"),
+      "build",
+      fixtureRoot,
+    ]);
+
+    assert.ok(
+      existsSync(resolve(fixtureRoot, ".output/public/remoteEntry.ssr.js")),
+      "fixture build did not publish the configured Bridge expose",
+    );
+    const manifest = JSON.parse(
+      await readFile(
+        resolve(fixtureRoot, ".output/public/mf-manifest.json"),
+        "utf8",
+      ),
+    );
+    assert.ok(
+      manifest.exposes?.some(({ path }) => path === "./bridge/export-app"),
+      "fixture manifest does not contain the configured Bridge expose",
+    );
+  },
+);
+
+test(
   "disabled remote SSR does not bundle the writable cache loader",
   { timeout: 45_000 },
   async (context) => {

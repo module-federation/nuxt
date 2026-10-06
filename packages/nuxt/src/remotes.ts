@@ -229,12 +229,16 @@ export function renderRemoteComponentTypes(components: RemoteComponent[]) {
     .join("\n")}\n`;
 }
 
-// Wildcard declarations only apply when a remote has no resolvable types, so
-// types downloaded by MF dts into the tsconfig paths take precedence.
+// Pattern declarations only apply when a module has no resolvable types, so
+// types downloaded by MF dts into the tsconfig paths take precedence. Each
+// pattern is anchored to one component so other exposes are not typed as
+// components.
 export function renderRemoteModuleFallbackTypes(components: RemoteComponent[]) {
-  return `${[...new Set(components.map((component) => component.remoteName))]
+  return `${components
     .map(
-      (remoteName) => `declare module ${JSON.stringify(`${remoteName}/*`)} {
+      (
+        component,
+      ) => `declare module ${JSON.stringify(`${component.importPath}*`)} {
   const component: import("vue").Component;
   export default component;
 }`,

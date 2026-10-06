@@ -3,6 +3,7 @@ import { spawn } from "node:child_process";
 import { once } from "node:events";
 import { existsSync } from "node:fs";
 import {
+  cp,
   mkdtemp,
   readdir,
   readFile,
@@ -21,8 +22,9 @@ export const repoRoot = resolve(
 export async function createNuxtFixture(app, config = {}) {
   const layer = resolve(repoRoot, "apps", app);
   const root = await mkdtemp(join(layer, ".nuxt-mf-test-"));
+  await cp(resolve(layer, "app"), resolve(root, "app"), { recursive: true });
   const source = `export default ${JSON.stringify(
-    { extends: [layer], srcDir: resolve(layer, "app"), ...config },
+    { extends: [layer], srcDir: resolve(root, "app"), ...config },
     null,
     2,
   )};\n`;

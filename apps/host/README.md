@@ -47,6 +47,10 @@ The page consumes it like any other Nuxt component:
 </template>
 ```
 
+### Bridge application remote
+
+`/bridge/*` mounts `remote/bridge/export-app` via `@module-federation/bridge-vue3` (`createRemoteAppComponent`) as a client-only island. Component federation on `/` is unchanged. The host registers a Vue Router catch-all (`/bridge/:pathMatch(.*)*`) so basename auto-detect works with current `bridge-vue3` releases.
+
 ## SSR behavior
 
 Nuxt 4.5 runs development with Vite 8 and Rolldown. Remote components render on the server during `pnpm dev`, then hydrate and remain interactive in the browser.

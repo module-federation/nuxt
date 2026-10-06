@@ -9,6 +9,18 @@ export default defineNuxtConfig({
     buildCache: false,
   },
 
+  hooks: {
+    // Vue Router catch-all name so bridge-vue3 basename auto-detect works
+    // without waiting for explicit-basename releases.
+    "pages:extend"(pages) {
+      pages.push({
+        name: "bridge-remote",
+        path: "/bridge/:pathMatch(.*)*",
+        file: "~/components/BridgeRemotePage.vue",
+      });
+    },
+  },
+
   moduleFederation: {
     remoteComponents: {
       remote: ["Widget", "Counter"],

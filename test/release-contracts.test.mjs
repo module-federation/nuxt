@@ -248,7 +248,7 @@ test("dts defaults resolve against the Nuxt root instead of srcDir", () => {
   );
 });
 
-test("downloaded remote types take precedence over component fallbacks", async () => {
+test("downloaded remote types take precedence over component-only fallbacks", async () => {
   const ts = nuxtPackageRequire("typescript");
   const dir = await mkdtemp(resolve(repoRoot, ".nuxt-mf-dts-"));
   const components = [
@@ -280,6 +280,9 @@ test("downloaded remote types take precedence over component fallbacks", async (
         'import { mfRemoteRemote_Counter, mfRemoteRemote_Widget } from "./remote-components";',
         "const widget: { typed: true } = mfRemoteRemote_Widget;",
         "const counter: { fallback: true } = mfRemoteRemote_Counter;",
+        "// @ts-expect-error non-component exposes keep strict resolution",
+        'type Bridge = typeof import("remote/bridge/export-app");',
+        "export type { Bridge };",
         "export { counter, widget };",
       ].join("\n"),
     );
