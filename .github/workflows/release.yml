@@ -17,6 +17,10 @@ on:
         description: Release Branch (confirm release branch)
         required: true
         default: main
+      tag:
+        description: Release tag to publish (set by Release Please; leave empty for previews)
+        required: false
+        default: ""
 
 permissions:
   contents: read
@@ -42,6 +46,8 @@ jobs:
         if: github.event_name == 'workflow_dispatch'
         env:
           RELEASE_BRANCH: ${{ github.event.inputs.branch }}
+          RELEASE_VERSION: ${{ github.event.inputs.version }}
+          RELEASE_TAG: ${{ github.event.inputs.tag }}
         run: |
           if [ "$RELEASE_BRANCH" != "main" ]; then
             echo "Releases must publish from main."
@@ -49,11 +55,17 @@ jobs:
             exit 1
           fi
 
+          if [ -n "$RELEASE_TAG" ] && [ "$RELEASE_VERSION" != "latest" ]; then
+            echo "A release tag can only be published with version=latest."
+            echo "Got: $RELEASE_VERSION"
+            exit 1
+          fi
+
       - name: Checkout source
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
           fetch-depth: 0
-          ref: ${{ github.event.release.tag_name || github.event.inputs.branch }}
+          ref: ${{ github.event.release.tag_name || github.event.inputs.tag || github.event.inputs.branch }}
 
       - name: Verify source is on main
         run: |
@@ -98,9 +110,9 @@ jobs:
           echo "Set preview version: $NEXT_VERSION"
 
       - name: Verify tag matches package version
-        if: github.event_name == 'release'
+        if: github.event_name == 'release' || github.event.inputs.tag != ''
         env:
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          RELEASE_TAG: ${{ github.event.release.tag_name || github.event.inputs.tag }}
         run: |
           TAG="$RELEASE_TAG"
           if [ "${TAG#v}" != "$TAG" ]; then
@@ -204,7 +216,7 @@ jobs:
         if: always()
         continue-on-error: true
         env:
-          SOURCE_REF: ${{ github.event.release.tag_name || github.event.inputs.branch }}
+          SOURCE_REF: ${{ github.event.release.tag_name || github.event.inputs.tag || github.event.inputs.branch }}
         run: |
           PKG_VERSION="$(node -p "require('./packages/nuxt/package.json').version")"
           echo "## npm publish" > "$GITHUB_STEP_SUMMARY"

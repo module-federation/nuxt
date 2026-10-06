@@ -7,6 +7,9 @@ on:
   pull_request:
     branches:
       - main
+  # Release Please dispatches this on its release branch; PRs it opens with
+  # GITHUB_TOKEN do not trigger pull_request workflows.
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
