@@ -18,23 +18,43 @@ jobs:
     name: Release Please
     if: github.repository == 'module-federation/nuxt'
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+      # GitHub suppresses push, pull_request, and release events created with
+      # GITHUB_TOKEN. workflow_dispatch is the exception, so this job dispatches
+      # CI for the release PR and the Release workflow for a new release.
+      actions: write
     steps:
-      - name: Validate release token
-        env:
-          REPO_SCOPED_TOKEN: ${{ secrets.REPO_SCOPED_TOKEN }}
-        run: |
-          if [ -z "$REPO_SCOPED_TOKEN" ]; then
-            echo "REPO_SCOPED_TOKEN is required so release PRs receive CI and published releases trigger the Release workflow."
-            exit 1
-          fi
-
       - name: Create release pull request or GitHub release
         id: release
         uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
         with:
-          token: ${{ secrets.REPO_SCOPED_TOKEN }}
+          token: ${{ secrets.GITHUB_TOKEN }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
+
+      - name: Run CI on the release pull request
+        if: steps.release.outputs.pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_JSON: ${{ steps.release.outputs.pr }}
+        run: |
+          RELEASE_BRANCH="$(node -p 'JSON.parse(process.env.PR_JSON).headBranchName')"
+          gh workflow run ci.yml --repo "$GITHUB_REPOSITORY" --ref "$RELEASE_BRANCH"
+          gh workflow run e2e-test.yml --repo "$GITHUB_REPOSITORY" --ref "$RELEASE_BRANCH"
+
+      - name: Publish the release to npm
+        if: steps.release.outputs.release_created == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG_NAME: ${{ steps.release.outputs.tag_name }}
+        run: |
+          gh workflow run release.yml --repo "$GITHUB_REPOSITORY" --ref main \
+            -f version=latest \
+            -f branch=main \
+            -f tag="$TAG_NAME"
 
       - name: Post summary
         if: always()
@@ -47,10 +67,10 @@ jobs:
           echo "## release-please" > "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
           if [ "$RELEASE_CREATED" = "true" ]; then
-            echo "Created GitHub release \`$TAG_NAME\`. The \`Release\` workflow publishes it to npm." >> "$GITHUB_STEP_SUMMARY"
+            echo "Created GitHub release \`$TAG_NAME\` and dispatched the \`Release\` workflow to publish it to npm." >> "$GITHUB_STEP_SUMMARY"
           elif [ -n "$PR_JSON" ]; then
-            PR_URL="$(node -p 'JSON.parse(process.env.PR_JSON).url' 2>/dev/null || true)"
-            echo "Release pull request is open or updated: ${PR_URL:-see pull requests}" >> "$GITHUB_STEP_SUMMARY"
+            PR_NUMBER="$(node -p 'JSON.parse(process.env.PR_JSON).number' 2>/dev/null || true)"
+            echo "Release pull request #${PR_NUMBER:-?} is open or updated, and CI was dispatched on its branch." >> "$GITHUB_STEP_SUMMARY"
           else
             echo "No releasable changes since the last release." >> "$GITHUB_STEP_SUMMARY"
           fi
