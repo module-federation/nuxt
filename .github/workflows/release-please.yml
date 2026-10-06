@@ -1,0 +1,56 @@
+name: Release Please
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-please
+  cancel-in-progress: false
+
+jobs:
+  release-please:
+    name: Release Please
+    if: github.repository == 'module-federation/nuxt'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate release token
+        env:
+          REPO_SCOPED_TOKEN: ${{ secrets.REPO_SCOPED_TOKEN }}
+        run: |
+          if [ -z "$REPO_SCOPED_TOKEN" ]; then
+            echo "REPO_SCOPED_TOKEN is required so release PRs receive CI and published releases trigger the Release workflow."
+            exit 1
+          fi
+
+      - name: Create release pull request or GitHub release
+        id: release
+        uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+        with:
+          token: ${{ secrets.REPO_SCOPED_TOKEN }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+      - name: Post summary
+        if: always()
+        continue-on-error: true
+        env:
+          RELEASE_CREATED: ${{ steps.release.outputs.release_created }}
+          TAG_NAME: ${{ steps.release.outputs.tag_name }}
+          PR_JSON: ${{ steps.release.outputs.pr }}
+        run: |
+          echo "## release-please" > "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          if [ "$RELEASE_CREATED" = "true" ]; then
+            echo "Created GitHub release \`$TAG_NAME\`. The \`Release\` workflow publishes it to npm." >> "$GITHUB_STEP_SUMMARY"
+          elif [ -n "$PR_JSON" ]; then
+            PR_URL="$(node -p 'JSON.parse(process.env.PR_JSON).url' 2>/dev/null || true)"
+            echo "Release pull request is open or updated: ${PR_URL:-see pull requests}" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "No releasable changes since the last release." >> "$GITHUB_STEP_SUMMARY"
+          fi
