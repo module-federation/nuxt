@@ -18,7 +18,7 @@ permissions:
 jobs:
   playwright:
     name: Playwright Tests
-    timeout-minutes: 10
+    timeout-minutes: 15
     runs-on: ubuntu-latest
     container:
       image: mcr.microsoft.com/playwright:v1.62.0-noble
@@ -45,6 +45,9 @@ jobs:
 
       - name: Run Playwright tests
         run: pnpm test:e2e
+
+      - name: Run development Playwright tests
+        run: pnpm test:e2e:dev
 
       - name: Upload artifacts on failure
         if: failure()

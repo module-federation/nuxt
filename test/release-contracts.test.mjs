@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { existsSync } from "node:fs";
 import { createRequire } from "node:module";
 import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
@@ -19,6 +20,14 @@ import {
 import { assertPortableSsrOutputGraph } from "../packages/nuxt/src/server-output-portability.ts";
 import { createSsrOutputFingerprint } from "../packages/nuxt/src/server-output-fingerprint.ts";
 import { patchServerExposeResolver } from "../packages/nuxt/src/server-expose-resolver.ts";
+import { patchRspackServerChunkLoading } from "../packages/nuxt/src/rspack-chunk-loading.ts";
+import { resolveRspackPackageDependency } from "../packages/nuxt/src/rspack-package-dependencies.ts";
+import { sanitizeJavaScriptComments } from "../packages/nuxt/src/javascript-comments.ts";
+import {
+  normalizeRspackRemotes,
+  resolveRspackRemoteOptions,
+} from "../packages/nuxt/src/rspack-remotes.ts";
+import rspackRemotes from "../packages/nuxt/src/runtime/rspack-remotes.ts";
 import { DEFAULT_BASE, normalizeBase } from "../packages/nuxt/src/options.ts";
 import { resolveBuildAssetUrl } from "../packages/nuxt/src/route-paths.ts";
 import { resolveRemoteComponents } from "../packages/nuxt/src/remotes.ts";
@@ -31,6 +40,46 @@ import { repoRoot } from "./helpers/release.mjs";
 const nuxtPackageRequire = createRequire(
   resolve(repoRoot, "packages/nuxt/package.json"),
 );
+
+test("Rspack accepts the same named and object remotes as Vite", () => {
+  const remotes = {
+    catalog: {
+      name: "catalogContainer",
+      type: "module",
+      entry: "https://remote.example/remoteEntry.js",
+      entryGlobalName: "catalogGlobal",
+      shareScope: "custom",
+    },
+    legacy: "legacy@https://remote.example/mf-manifest.json",
+    bare: "https://remote.example/mf-manifest.json",
+  };
+  assert.deepEqual(normalizeRspackRemotes(remotes), {
+    catalog: {
+      external: "catalogContainer@https://remote.example/remoteEntry.js",
+      shareScope: "custom",
+    },
+    legacy: remotes.legacy,
+    bare: `bare@${remotes.bare}`,
+  });
+  const args = {
+    userOptions: {
+      remotes: [
+        { alias: "catalog", name: "catalogContainer", type: "script" },
+        { name: "legacy", type: "script" },
+      ],
+    },
+  };
+  rspackRemotes(resolveRspackRemoteOptions(remotes)).beforeInit(args);
+  assert.deepEqual(args.userOptions.remotes, [
+    {
+      alias: "catalog",
+      name: "catalogContainer",
+      type: "module",
+      entryGlobalName: "catalogGlobal",
+    },
+    { name: "legacy", type: "script" },
+  ]);
+});
 
 test("federation assets use root URLs by default", () => {
   assert.equal(DEFAULT_BASE, "/");
@@ -487,4 +536,59 @@ test("SSR expose resolver seeds exposed modules before Rolldown resolves them", 
     id: `${dependencyPath}?__mf_ssr_expose`,
     external: false,
   });
+});
+
+test("Rspack server chunk loading does not depend on CSS runtime output", () => {
+  const source = `
+__webpack_require__.f.consumes = () => {};
+const load = import("./" + __webpack_require__.u(chunkId));
+// webpack/runtime/get javascript chunk filename
+`;
+  const patched = patchRspackServerChunkLoading(source, [[123, "123.mjs"]]);
+
+  assert.match(patched, /123: \(\) => import\("\.\/123\.mjs"\)/);
+  assert.match(patched, /__webpack_require__\.f\.j =/);
+  assert.doesNotMatch(
+    patched,
+    /import\("\.\/" \+ __webpack_require__\.u\(chunkId\)\)/,
+  );
+  assert.doesNotMatch(patched, /webpack\/runtime\/get mini-css chunk filename/);
+
+  const devPatched = patchRspackServerChunkLoading(
+    `
+__webpack_require__.f.consumes = () => {};
+// webpack/runtime/make_namespace_object
+`,
+    [],
+  );
+  assert.match(
+    devPatched,
+    /__webpack_require__\.f = \{\};[\s\S]*__webpack_require__\.f\.consumes/,
+  );
+});
+
+test("Rspack package-owned dependencies resolve from the Nuxt module", () => {
+  for (const specifier of [
+    "@module-federation/vite/ssrEntryLoader",
+    "@module-federation/runtime",
+    "@module-federation/runtime-core",
+    "@module-federation/sdk",
+  ]) {
+    assert.ok(existsSync(resolveRspackPackageDependency(specifier)), specifier);
+  }
+});
+
+test("Rspack comment sanitation preserves JavaScript literal contents", () => {
+  const source = `
+const block = "/* import('./literal.js') */";
+const line = "//# sourceMappingURL=literal.js.map";
+/* import('./comment-only.js') */
+//# sourceMappingURL=output.js.map
+`;
+  const sanitized = sanitizeJavaScriptComments(source);
+
+  assert.match(sanitized, /"\/\* import\('\.\/literal\.js'\) \*\/"/);
+  assert.match(sanitized, /"\/\/# sourceMappingURL=literal\.js\.map"/);
+  assert.match(sanitized, /typeImport\('\.\/comment-only\.js'\)/);
+  assert.doesNotMatch(sanitized, /sourceMappingURL=output\.js\.map/);
 });

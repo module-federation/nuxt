@@ -10,13 +10,17 @@
     "dev:remote": "pnpm --filter @module-federation/nuxt build && turbo run dev --filter=nuxt-remote",
     "test": "node --test --test-concurrency=1 test/*.test.mjs",
     "test:e2e": "playwright test --config=playwright.config.mjs",
+    "test:e2e:dev": "E2E_MODE=dev playwright test --config=playwright.config.mjs",
     "changeset": "changeset",
     "changeset:status": "changeset status",
     "format": "prettier --write \"packages/**/*.{ts,md,json}\" \"apps/**/*.{ts,vue,md,json}\" \"test/**/*.mjs\" \"e2e/**/*.mjs\" \"playwright.config.mjs\" \"docs/**/*.md\" \"*.{md,json}\" \".github/**/*.yml\"",
     "format:check": "prettier --check \"packages/**/*.{ts,md,json}\" \"apps/**/*.{ts,vue,md,json}\" \"test/**/*.mjs\" \"e2e/**/*.mjs\" \"playwright.config.mjs\" \"docs/**/*.md\" \"*.{md,json}\" \".github/**/*.yml\"",
     "pack:nuxt": "pnpm --filter @module-federation/nuxt run pack:dry",
     "publish:nuxt": "pnpm --filter @module-federation/nuxt publish",
-    "typecheck": "turbo run typecheck"
+    "typecheck": "turbo run typecheck",
+    "build:vite": "turbo run build --filter=nuxt-host --filter=nuxt-remote",
+    "build:rspack": "turbo run build --filter=nuxt-host-rspack --filter=nuxt-remote-rspack",
+    "dev:rspack": "pnpm build:package && turbo run dev --filter=nuxt-host-rspack --filter=nuxt-remote-rspack"
   },
   "devDependencies": {
     "@playwright/test": "1.62.0",

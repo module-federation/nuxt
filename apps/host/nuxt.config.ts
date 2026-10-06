@@ -1,3 +1,5 @@
+import { fileURLToPath } from "node:url";
+
 const isDev = process.env.NODE_ENV !== "production";
 
 // https://nuxt.com/docs/api/configuration/nuxt-config
@@ -28,6 +30,11 @@ export default defineNuxtConfig({
     config: {
       name: "host",
       hostInitInjectLocation: "entry",
+      runtimePlugins: [
+        fileURLToPath(
+          new URL("./federation-browser-origin.ts", import.meta.url),
+        ),
+      ],
       remotes: {
         remote: {
           type: "module",
