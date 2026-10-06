@@ -142,9 +142,9 @@ For a production smoke test, start both built applications with `pnpm preview`, 
 
 ## Release flow
 
-- Versioning: Changesets (`pnpm changeset`)
-- Version PR: GitHub Actions `Release Pull Request`
-- Publish: GitHub Actions `Release`
+- Versioning: [release-please](https://github.com/googleapis/release-please) from Conventional Commit PR titles (`fix:`, `feat:`, `feat!:`)
+- Release PR: GitHub Actions `Release Please`, opened and updated automatically on every push to `main`
+- Publish: merging the release PR creates a GitHub release, which triggers GitHub Actions `Release` to publish to npm
 - Release procedure: [`docs/RELEASING.md`](docs/RELEASING.md)
 
 ## Repository layout
