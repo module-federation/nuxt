@@ -1,10 +1,10 @@
 # @module-federation/nuxt
 
-Nuxt integration for Module Federation, built on top of `@module-federation/vite`.
+Nuxt integration for Module Federation, using `@module-federation/vite` or `@module-federation/enhanced/rspack` according to Nuxt's builder.
 
 ## Requirements
 
-- Nuxt `>=4.5.1` (Vite 8 with Rolldown)
+- Nuxt `>=4.5.1`, with the default Vite builder or a matching `@nuxt/rspack-builder`
 - Node.js `^22.18.0`, `^24.11.0`, or `>=26.0.0`
 
 Production builds support server-rendered remote components on writable Node deployments. The default upstream SSR loader writes fetched modules under `process.cwd()/node_modules/.ssr-cache`; read-only and serverless filesystems are not currently supported for remote SSR.
@@ -22,6 +22,24 @@ export default defineNuxtConfig({
   modules: ["@module-federation/nuxt"],
 });
 ```
+
+## Choose a builder
+
+Vite is the default. For Rspack, install `@nuxt/rspack-builder` at the same version as Nuxt and configure `builder: "rspack"`. The module uses Nuxt's Rspack client and server compilers, including Nuxt's Vue server transforms. Webpack and custom builder objects are rejected with an explicit error.
+
+```bash
+pnpm add -D @nuxt/rspack-builder@4.5.1
+```
+
+```ts
+export default defineNuxtConfig({
+  builder: "rspack",
+  modules: ["@module-federation/nuxt"],
+  moduleFederation: { config: { name: "catalog" } },
+});
+```
+
+The common `config` options and object remote format below work with either builder. Rspack also accepts its additional plugin options, such as `experiments` and `remoteType`. Vite-specific build options such as `hostInitInjectLocation` apply only to Vite. Use manifest URLs for cross-builder remotes so the runtime discovers the correct entry type.
 
 ## Configure a remote
 
@@ -46,7 +64,7 @@ app/components/exposed/ProductCard.vue
 
 The module registers it as a local Nuxt component and exposes it to hosts as `./ProductCard`.
 
-You can also configure exposes directly with the underlying MF Vite API:
+You can also configure exposes directly:
 
 ```ts
 export default defineNuxtConfig({
@@ -139,7 +157,7 @@ The remote publishes `@mf-types.zip` and `@mf-types.d.ts` next to its manifest. 
 
 The host downloads those types into `<rootDir>/@mf-types` when the dev server starts, and resolves `RemoteProductCard`, `#components`, and `import("catalog/ProductCard")` from them. Builds only download types when `consumeTypes.typesOnBuild` is `true`, which requires the remote to be reachable at build time. Without downloaded types, registered remote components fall back to `Component`, so type checks do not depend on a running remote. Other exposes, such as a Bridge export, still need their own declaration; declare them with a wildcard such as `declare module "catalog/bridge/*"` so downloaded types take precedence. Add `@mf-types` to `.gitignore`.
 
-Relative `dts` paths such as `tsConfigPath`, `cwd`, and `consumeTypes.typesFolder` resolve from the Nuxt application root.
+Relative `dts` paths such as `tsConfigPath`, `cwd`, and `consumeTypes.typesFolder` resolve from the Nuxt application root. These Nuxt defaults apply to the Vite builder. With `builder: "rspack"`, `config.dts` is passed to `@module-federation/enhanced` unchanged.
 
 ### Bridge application export (optional)
 
@@ -186,7 +204,9 @@ Hosts load it with `createRemoteAppComponent` from `@module-federation/bridge-vu
 
 Nuxt 4.5 uses Vite 8's Rolldown pipeline. The same federation plugin participates in the client and server environments, so remote components render during both `nuxt dev` and production SSR.
 
-Development remote manifests infer their asset origin from the manifest URL. This keeps `remoteEntry.js` and exposed chunks on the remote origin when the host and remote use different ports. An explicit `config.publicPath` still takes precedence.
+Rspack uses Nuxt's separate server compiler for its SSR entry. A Rspack application with Nuxt's top-level `ssr: false` publishes browser assets only; its manifest does not advertise a server entry. To keep publishing server exposes while disabling remote consumption on the server, use `moduleFederation.ssr: false` and leave Nuxt SSR enabled.
+
+Development remote manifests infer their asset origin from the manifest URL. Rspack serves emitted federation assets before Nuxt's development origin guard; unrelated development routes remain protected. This keeps `remoteEntry.js` and exposed chunks on the remote origin when the host and remote use different ports. An explicit `config.publicPath` still takes precedence.
 
 Disable remote SSR explicitly when the remote is browser-only:
 
@@ -227,13 +247,15 @@ export default defineNuxtConfig({
 });
 ```
 
-During setup, the module compares manifest-provided shared versions with the host's installed versions. Major-version differences produce a warning because the server uses the host's copy without runtime version negotiation.
+During Vite setup, the module compares manifest-provided shared versions with the host's installed versions. Major-version differences produce a warning because the Vite server uses the host's copy without runtime version negotiation. Rspack also uses the host's installed Vue for SSR under the default shared Vue configuration and reports Vue version mismatches. Other Rspack server shares continue to use the federation share scope.
 
 When a shared dependency uses `import: false`, it is not bundled as a local federation provider, but SSR remote loading still evaluates its bare import in the host process. The host must install that dependency; when `requiredVersion` is set, setup validates the installed version and fails with the package name before remote loading begins. The dependency is also included in Nitro's standalone trace.
 
 Server exposes bundle their non-shared npm dependencies into the published SSR graph, so a remote-only package does not need to be installed by every host. `config.ssrExternals` opts packages out of that bundling. Every consuming host must install those explicit externals at a compatible version and list them in its own `config.ssrExternals` so Nitro includes them in standalone output. The SSR loader keeps these imports as bare specifiers, preserving each package's ESM `import` export condition. Prefer `config.shared` for framework runtimes and other singleton dependencies.
 
 Advanced `@module-federation/vite/ssrEntryLoader` `resolvedShared` mappings must point to absolute files inside named, installed packages. The module stores them as package-relative descriptors so standalone output does not retain build-machine paths; app-local file mappings fail during setup with an actionable error.
+
+Rspack SSR leaves `vue` and `vue/server-renderer` as native package imports so the host renderer and remote components use one runtime. Browser federation sharing is unchanged. Keep Nuxt's default `experimental.externalVue: true`; disabling it with shared Vue SSR produces a setup error. Custom Vue implementations, `singleton: false`, and configurations that omit Vue sharing opt out of this normalization.
 
 ## Deployment contract
 
@@ -261,19 +283,19 @@ For immutable releases, deploy the remote before deploying a host that reference
 
 Configure these values under `moduleFederation` in `nuxt.config.ts`.
 
-| Option                   | Type                               | Default                  | Description                                                                                            |
-| ------------------------ | ---------------------------------- | ------------------------ | ------------------------------------------------------------------------------------------------------ |
-| `base`                   | `string`                           | `"/"`                    | Public route and output directory for federation entries and the manifest.                             |
-| `exposedDir`             | `string`                           | `"~/components/exposed"` | Directory whose Nuxt components are exposed automatically.                                             |
-| `manifestFetchTimeoutMs` | `number`                           | `500`                    | Maximum setup time for fetching each remote manifest.                                                  |
-| `manifestMetadata`       | `Record<string, unknown>`          | `{}`                     | Values merged into `metaData.custom` in generated manifest and stats files.                            |
-| `remoteComponents`       | `Record<string, string[]>`         | `{}`                     | Component exposes to register when manifest discovery is unavailable or disabled.                      |
-| `ssr`                    | `boolean`                          | `true`                   | Render consumed remote components on the Nuxt server. Server exposes are still published when `false`. |
-| `ssrFetchTimeoutMs`      | `number`                           | `10000`                  | Maximum time for each SSR remote network request; `0` disables the timeout.                            |
-| `ssrManifestMaxAgeMs`    | `number`                           | `30000`                  | Interval before the server re-checks a remote manifest for a new release.                              |
-| `config`                 | `Partial<ModuleFederationOptions>` | See below                | Options passed to `@module-federation/vite`.                                                           |
+| Option                   | Type                       | Default                  | Description                                                                                            |
+| ------------------------ | -------------------------- | ------------------------ | ------------------------------------------------------------------------------------------------------ |
+| `base`                   | `string`                   | `"/"`                    | Public route and output directory for federation entries and the manifest.                             |
+| `exposedDir`             | `string`                   | `"~/components/exposed"` | Directory whose Nuxt components are exposed automatically.                                             |
+| `manifestFetchTimeoutMs` | `number`                   | `500`                    | Maximum setup time for fetching each remote manifest.                                                  |
+| `manifestMetadata`       | `Record<string, unknown>`  | `{}`                     | Values merged into `metaData.custom` in generated manifest and stats files.                            |
+| `remoteComponents`       | `Record<string, string[]>` | `{}`                     | Component exposes to register when manifest discovery is unavailable or disabled.                      |
+| `ssr`                    | `boolean`                  | `true`                   | Render consumed remote components on the Nuxt server. Server exposes are still published when `false`. |
+| `ssrFetchTimeoutMs`      | `number`                   | `10000`                  | Maximum time for each SSR remote network request; `0` disables the timeout.                            |
+| `ssrManifestMaxAgeMs`    | `number`                   | `30000`                  | Interval before the server re-checks a remote manifest for a new release.                              |
+| `config`                 | `FederationOptions`        | See below                | Common federation options plus additional Rspack options, passed to the selected builder adapter.      |
 
-The MF Vite config defaults are:
+The shared configuration defaults are:
 
 ```ts
 {
@@ -286,7 +308,7 @@ The MF Vite config defaults are:
 }
 ```
 
-User values take precedence except for `config.target`. A single MF plugin serves both Nuxt environments, so the module always owns that setting and selects `web` for the client and `node` for the server build. Setting `config.manifest` to `false` disables the app's manifest output, remote manifest-based component discovery, and automatic detection of new SSR builds; configure `remoteComponents` on every host and restart long-lived hosts after remote deployments in that case. Direct `remoteEntry.js` consumption remains supported.
+The module owns environment-specific runtime targets. Vite uses one plugin across its client and server environments; Rspack registers a separate federation plugin for each compiler. Rspack also owns server entry format, eager server shares, and client runtime extraction so remote entries can initialize independently of the remote Nuxt page. Setting `config.manifest` to `false` disables the app's manifest output, remote manifest-based component discovery, and automatic detection of new SSR builds; configure `remoteComponents` on every host and restart long-lived hosts after remote deployments in that case. Direct `remoteEntry.js` consumption remains supported.
 
 ## Verify an application
 

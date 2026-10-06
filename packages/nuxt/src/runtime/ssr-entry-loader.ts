@@ -24,6 +24,7 @@ const MAX_ENTRY_REDIRECTS = 5;
 const patchedManifestFetchHooks = new WeakSet<object>();
 
 interface PortableSsrEntryLoaderOptions {
+  configuredRemoteEntries?: Record<string, string>;
   fetchTimeoutMs?: number;
   hostName: string;
   maxAgeMs?: number;
@@ -80,6 +81,7 @@ export default function portableSsrEntryLoader(
   options: PortableSsrEntryLoaderOptions,
 ): PortableSsrEntryLoaderPlugin {
   const {
+    configuredRemoteEntries = {},
     hostName,
     portableResolvedShared = {},
     requiredPackages = [],
@@ -138,6 +140,7 @@ export default function portableSsrEntryLoader(
       const remoteInfo = resolveOriginalRemoteInfo(
         loadOptions.origin,
         loadOptions.remoteInfo,
+        configuredRemoteEntries,
       );
       rememberRemote(knownRemotes, remoteInfo);
       const redirectResolution = await resolveRemoteEntryRedirect(
@@ -411,7 +414,13 @@ async function refreshRemoteEntry(
 function resolveOriginalRemoteInfo(
   host: RuntimeHost | undefined,
   remoteInfo: RuntimeRemoteInfo,
+  configuredRemoteEntries: Record<string, string>,
 ): RuntimeRemoteInfo {
+  const configuredEntry =
+    configuredRemoteEntries[remoteInfo.name] ||
+    (remoteInfo.alias ? configuredRemoteEntries[remoteInfo.alias] : undefined);
+  if (configuredEntry) return { ...remoteInfo, entry: configuredEntry };
+
   // runtime-core records the manifest URL as the snapshot version before it
   // replaces entry with the resolved SSR asset. Preserve that exact URL so
   // custom manifest paths remain versioned and refreshable.

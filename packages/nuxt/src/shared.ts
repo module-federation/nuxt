@@ -107,9 +107,8 @@ export function validateImportFalseSharedPackages(
 }
 
 /**
- * The Vite server-side federation build has no share scope (shared modules
- * are aliased to the host's installed copies), so version mismatches with a
- * remote are never negotiated at runtime. Surface them at build time instead.
+ * Native SSR externals use the host's installed copies rather than runtime
+ * version negotiation. Surface mismatches with those remote shares at setup.
  */
 export function warnOnSharedVersionMismatches(
   nuxt: Nuxt,

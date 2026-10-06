@@ -1,6 +1,6 @@
 # Nuxt Module Federation
 
-Use Module Federation in Nuxt applications with `@module-federation/nuxt`, built on top of `@module-federation/vite`.
+Use Module Federation in Nuxt applications with `@module-federation/nuxt`, using `@module-federation/vite` or `@module-federation/enhanced/rspack` according to Nuxt's builder.
 
 > [!IMPORTANT]
 > `@module-federation/nuxt` is still in beta. Expect API changes while the integration settles. Please report bugs and edge cases in this repository.
@@ -78,6 +78,23 @@ Use the remote as a normal Nuxt component:
 
 See [`packages/nuxt/README.md`](packages/nuxt/README.md) for the complete option reference, component naming rules, sharing behavior, and deployment contract.
 
+## Choose a builder
+
+Vite is the default. To use Rspack, install the builder matching your Nuxt version and set `builder: "rspack"` in both applications:
+
+```bash
+pnpm add -D @nuxt/rspack-builder@4.5.1
+```
+
+```ts
+export default defineNuxtConfig({
+  builder: "rspack",
+  modules: ["@module-federation/nuxt"],
+});
+```
+
+Both builders use the same `moduleFederation` configuration and can consume each other's manifests. Prefer manifest URLs so the runtime selects each remote's browser and server entry types. See [the builder integration notes](docs/bundlers.md) for the implementation and validation matrix.
+
 ## Server rendering
 
 Remote components render on the Nuxt server by default. Production remotes publish both `remoteEntry.js` and `remoteEntry.ssr.js`; the host loads the server entry while rendering and hydrates the same component in the browser.
@@ -90,8 +107,10 @@ Nuxt 4.5 uses Vite 8's Rolldown pipeline. The MF server runner uses its ModuleRu
 
 - Host: [`apps/host`](apps/host) at `http://localhost:4173`
 - Remote: [`apps/remote`](apps/remote) at `http://localhost:4174`
+- Rspack host: [`apps/host-rspack`](apps/host-rspack) at `http://localhost:4175`
+- Rspack remote: [`apps/remote-rspack`](apps/remote-rspack) at `http://localhost:4176`
 
-Run both from the repository root:
+Run all four applications from the repository root:
 
 ```bash
 pnpm install
@@ -107,6 +126,8 @@ pnpm dev:host
 
 The ports are fixed because the host's remote URL depends on the remote remaining at `4174`.
 
+To view the built examples from another computer, run `pnpm build` and `pnpm preview`, then open this machine's network hostname on port `4173` or `4175`. The examples replace loopback remote hostnames with the browser's hostname while preserving each remote's port and path. Server rendering continues to use loopback, and explicitly configured non-loopback remote URLs stay unchanged. Use the production preview for this: Nuxt's development origin checks can reject requests over plain HTTP on the local network.
+
 ## Build checks
 
 ```bash
@@ -114,6 +135,7 @@ pnpm typecheck
 pnpm build
 pnpm test
 pnpm test:e2e
+pnpm test:e2e:dev
 pnpm pack:nuxt
 ```
 

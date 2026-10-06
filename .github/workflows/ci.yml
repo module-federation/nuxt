@@ -50,6 +50,8 @@ jobs:
           pnpm build:package
           pnpm --filter nuxt-remote exec nuxt build
           pnpm --filter nuxt-host exec nuxt build
+          pnpm --filter nuxt-remote-rspack exec nuxt build
+          pnpm --filter nuxt-host-rspack exec nuxt build
 
       - name: Test package and production examples
         run: pnpm test

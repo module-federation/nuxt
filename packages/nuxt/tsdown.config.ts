@@ -8,6 +8,8 @@ const external = [
   "@module-federation/runtime/*",
   "@module-federation/vite",
   "@module-federation/vite/*",
+  "@module-federation/enhanced",
+  "@module-federation/enhanced/*",
   "@nuxt/kit",
   "@nuxt/kit/*",
 ];
@@ -24,6 +26,9 @@ export default defineConfig({
     federation: "./federation.ts",
     "shared-strategy": "./src/runtime/shared-strategy.ts",
     "ssr-entry-loader": "./src/runtime/ssr-entry-loader.ts",
+    "rspack-vite-loader": "./src/runtime/rspack-vite-loader.ts",
+    "rspack-remotes": "./src/runtime/rspack-remotes.ts",
+    "rspack-hmr-loader": "./src/runtime/rspack-hmr-loader.ts",
   },
   format: ["esm"],
   outDir: "dist",

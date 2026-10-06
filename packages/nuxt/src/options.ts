@@ -1,4 +1,13 @@
 import type { ModuleFederationOptions } from "@module-federation/vite";
+import type { moduleFederationPlugin } from "@module-federation/enhanced";
+
+export type FederationOptions = Partial<ModuleFederationOptions> &
+  Partial<
+    Omit<
+      moduleFederationPlugin.ModuleFederationPluginOptions,
+      keyof ModuleFederationOptions
+    >
+  >;
 
 export const DEFAULT_BASE = "/";
 export const DEFAULT_EXPOSED_DIR = "~/components/exposed";
@@ -23,7 +32,7 @@ export interface ModuleOptions {
    * back to client-only rendering of remote components.
    */
   ssr?: boolean;
-  config?: Partial<ModuleFederationOptions>;
+  config?: FederationOptions;
 }
 
 export const defaultModuleOptions = {
