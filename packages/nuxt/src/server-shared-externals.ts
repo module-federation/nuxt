@@ -2,6 +2,8 @@ import { addVitePlugin, resolvePath } from "@nuxt/kit";
 import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { isJsonObject } from "./json";
+import { isMfSsrRemoteEntryImporter } from "./runtime-plugin-importer";
+import { matchesPackageSpecifier } from "./server-expose-resolver";
 
 const ROUTER_INJECTION_KEYS = [
   "matchedRouteKey",
@@ -39,16 +41,14 @@ export async function registerServerSharedExternals(
       name: "module-federation:nuxt:ssr-shared-externals",
       enforce: "pre",
       async resolveId(id) {
-        const isSharedPackage = packageNames.some(
-          (candidate) => id === candidate || id.startsWith(`${candidate}/`),
+        const isSharedPackage = packageNames.some((candidate) =>
+          matchesPackageSpecifier(id, candidate),
         );
         if (!isSharedPackage) return;
 
         if (dev) {
           return {
-            id:
-              resolvedDevImports.get(id) ||
-              (await resolveDevImport(id, rootDir)),
+            id: await resolveDevSharedImport(id, rootDir, resolvedDevImports),
             external: false,
           };
         }
@@ -58,17 +58,51 @@ export async function registerServerSharedExternals(
     { client: false, prepend: true },
   );
 
+  // Vite 8 resolves the SSR remote entry in a virtual environment that is
+  // not covered by Nuxt's server-only plugin wrapper. Resolve its bare shared
+  // imports explicitly while leaving normal browser imports to MF Vite.
   if (dev) {
+    addVitePlugin(
+      {
+        name: "module-federation:nuxt:ssr-remote-shared-resolver",
+        enforce: "pre",
+        resolveId: {
+          order: "pre",
+          async handler(id, importer) {
+            if (!isMfSsrRemoteEntryImporter(importer)) return;
+
+            const isSharedPackage = packageNames.some((candidate) =>
+              matchesPackageSpecifier(id, candidate),
+            );
+            if (!isSharedPackage) return;
+
+            return {
+              id: await resolveDevSharedImport(id, rootDir, resolvedDevImports),
+              external: false,
+            };
+          },
+        },
+      },
+      { prepend: true },
+    );
     const runnerImports = new Map(
       [...resolvedDevImports].filter(([packageName]) =>
         runnerPackageNames.includes(packageName),
       ),
     );
     registerDevRunnerPlugin(runnerImports);
+    if (packageNames.includes("vue-router")) {
+      registerVueRouterInjectionKeyPlugin();
+    }
   }
-  if (dev && packageNames.includes("vue-router")) {
-    registerVueRouterInjectionKeyPlugin();
-  }
+}
+
+async function resolveDevSharedImport(
+  id: string,
+  rootDir: string,
+  resolvedDevImports: Map<string, string>,
+) {
+  return resolvedDevImports.get(id) || (await resolveDevImport(id, rootDir));
 }
 
 function registerVueRouterInjectionKeyPlugin() {

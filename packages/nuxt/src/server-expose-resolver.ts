@@ -305,7 +305,7 @@ function isBareSpecifier(id: string) {
   );
 }
 
-function matchesPackageSpecifier(id: string, packageName: string) {
+export function matchesPackageSpecifier(id: string, packageName: string) {
   const normalized = packageName.replace(/\/+$/, "");
   return Boolean(
     normalized && (id === normalized || id.startsWith(`${normalized}/`)),

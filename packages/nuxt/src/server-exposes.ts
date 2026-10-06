@@ -17,6 +17,7 @@ import {
   MF_SSR_ENTRY_PRE_PLUGIN,
   patchServerExposeResolver,
 } from "./server-expose-resolver";
+import { MF_REMOTE_ENTRY_SSR_ID } from "./runtime-plugin-importer";
 import {
   createSsrOutputFingerprint,
   stripSourceMapReference,
@@ -28,7 +29,6 @@ import {
 
 const MF_SSR_ENTRY_PLUGIN = "mf:ssr-remote-entry";
 const MF_INTERNAL_NAME_PREFIX = "__mfe_internal__";
-const MF_SSR_ENTRY_ID = "virtual:mf-REMOTE_ENTRY_SSR_ID";
 
 type FederationConfig = NonNullable<ModuleOptions["config"]>;
 
@@ -248,7 +248,7 @@ function resolveMfSsrEntryId(config: ServerExposeConfig) {
     "_",
   );
 
-  return `${MF_SSR_ENTRY_ID}:${token}`;
+  return `${MF_REMOTE_ENTRY_SSR_ID}:${token}`;
 }
 
 function isServerBuild(context: BuildContext) {

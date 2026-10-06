@@ -332,23 +332,24 @@ export function startNitro(app, port, cwd) {
   return child;
 }
 
-export function startNuxtDev(app, port) {
-  const appRoot = resolve(repoRoot, `apps/${app}`);
-  const child = spawn(
-    process.execPath,
-    [nuxtCliPath(app), "dev", "--port", String(port)],
-    {
-      cwd: appRoot,
-      env: {
-        ...process.env,
-        HOST: "127.0.0.1",
-        NODE_OPTIONS: [process.env.NODE_OPTIONS, "--dns-result-order=ipv4first"]
-          .filter(Boolean)
-          .join(" "),
-      },
-      stdio: ["ignore", "pipe", "pipe"],
+export function startNuxtDev(app, port, cwd) {
+  const appRoot = cwd || resolve(repoRoot, `apps/${app}`);
+  const cliArgs = [nuxtCliPath(app), "dev"];
+  if (cwd) cliArgs.push(cwd);
+  cliArgs.push("--host", "127.0.0.1", "--port", String(port));
+
+  const child = spawn(process.execPath, cliArgs, {
+    cwd: appRoot,
+    env: {
+      ...process.env,
+      HOST: "127.0.0.1",
+      NODE_ENV: "development",
+      NODE_OPTIONS: [process.env.NODE_OPTIONS, "--dns-result-order=ipv4first"]
+        .filter(Boolean)
+        .join(" "),
     },
-  );
+    stdio: ["ignore", "pipe", "pipe"],
+  });
   child.output = "";
 
   for (const stream of [child.stdout, child.stderr]) {
