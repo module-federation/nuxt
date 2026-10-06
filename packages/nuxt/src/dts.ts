@@ -17,6 +17,7 @@ type DtsHostOptions = Exclude<
 
 const DEFAULT_TYPES_FOLDER = "@mf-types";
 const DTS_TSCONFIG_FILE = "tsconfig.mf-types.json";
+const DTS_EXPOSES_FILE = "mf-types.exposes.d.ts";
 
 export interface NuxtDtsPaths {
   buildDir: string;
@@ -114,10 +115,22 @@ export function resolveGeneratedTypesFileNames(dts: DtsOption) {
   return [`${typesFolder}.zip`, `${typesFolder}.d.ts`];
 }
 
+/** Side-effect imports that pull exposed files into the declaration build. */
+export function renderExposesDeclaration(filePaths: string[]) {
+  return [
+    "export {};",
+    ...filePaths.map(
+      (filePath) => `import ${JSON.stringify(filePath.split(sep).join("/"))};`,
+    ),
+    "",
+  ].join("\n");
+}
+
 export function registerDtsTemplates(
   nuxt: Nuxt,
   dts: DtsOption,
   remoteNames: string[],
+  exposed: Record<string, string>,
 ) {
   const options = resolveNuxtDtsOptions(dts, nuxt.options);
   if (!options) return;
@@ -140,6 +153,10 @@ export function registerDtsTemplates(
         JSON.stringify(
           {
             extends: "./tsconfig.app.json",
+            // `nuxt build` moves buildDir under `node_modules/.cache` when
+            // `.nuxt` already exists, and TypeScript drops `include` matches
+            // inside `node_modules`, so both entries are listed explicitly.
+            files: ["./nuxt.d.ts", `./${DTS_EXPOSES_FILE}`],
             compilerOptions: {
               rootDir: declarationRoot,
               tsBuildInfoFile: join(
@@ -151,6 +168,17 @@ export function registerDtsTemplates(
           null,
           2,
         ),
+    });
+
+    // MF only hands the compiler the dependencies TypeScript finds from the
+    // exposes, which skips SFCs. Nuxt's components.d.ts reaches them through
+    // relative imports, but TypeScript treats those as external libraries,
+    // and emits nothing for them, once buildDir lives in `node_modules`.
+    // Absolute imports keep exposed SFCs in the emitted program either way.
+    addTemplate({
+      filename: DTS_EXPOSES_FILE,
+      write: true,
+      getContents: () => renderExposesDeclaration(Object.values(exposed)),
     });
   }
 

@@ -45,6 +45,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Typecheck workspace
+        run: pnpm typecheck
+
       - name: Build package and examples
         run: |
           pnpm build:package
@@ -55,9 +58,6 @@ jobs:
 
       - name: Test package and production examples
         run: pnpm test
-
-      - name: Typecheck workspace
-        run: pnpm typecheck
 
       - name: Check formatting
         run: pnpm format:check

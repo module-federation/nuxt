@@ -43,6 +43,7 @@ import {
   resolveRemoteComponents,
 } from "../packages/nuxt/src/remotes.ts";
 import {
+  renderExposesDeclaration,
   resolveGeneratedTypesFileNames,
   resolveNuxtDtsOptions,
 } from "../packages/nuxt/src/dts.ts";
@@ -364,6 +365,23 @@ test("dts defaults resolve against the Nuxt root instead of srcDir", () => {
   assert.deepEqual(
     resolveGeneratedTypesFileNames({ generateTypes: { typesFolder: "types" } }),
     ["types.zip", "types.d.ts"],
+  );
+});
+
+test("exposed SFCs reach the type build through absolute imports", () => {
+  // Relative imports from a buildDir under node_modules/.cache would mark
+  // the SFCs as external libraries and skip their declarations.
+  assert.equal(
+    renderExposesDeclaration([
+      "/app/app/components/exposed/Widget.vue",
+      "/app/app/components/exposed/Counter.vue",
+    ]),
+    [
+      "export {};",
+      'import "/app/app/components/exposed/Widget.vue";',
+      'import "/app/app/components/exposed/Counter.vue";',
+      "",
+    ].join("\n"),
   );
 });
 
