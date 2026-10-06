@@ -31,13 +31,6 @@ jobs:
     runs-on: ubuntu-latest
     environment: Publish
     steps:
-      - name: Reject GitHub prereleases
-        if: github.event_name == 'release' && github.event.release.prerelease
-        run: |
-          echo "GitHub prereleases are not published."
-          echo "Stable releases come from release-please. For a preview, run this workflow manually with version=next."
-          exit 1
-
       - name: Validate manual publish target
         if: github.event_name == 'workflow_dispatch'
         env:
@@ -90,10 +83,10 @@ jobs:
       - name: Generate preview version
         if: github.event_name == 'workflow_dispatch' && github.event.inputs.version == 'next'
         run: |
-          CURRENT_VERSION="$(node -p "require('./packages/nuxt/package.json').version")"
-          BASE_VERSION="${CURRENT_VERSION%%-*}"
-          NEXT_PATCH="$(node -p "const [major, minor, patch] = process.argv[1].split('.').map(Number); [major, minor, patch + 1].join('.')" "$BASE_VERSION")"
-          NEXT_VERSION="${NEXT_PATCH}-next.${GITHUB_RUN_ID}"
+          pnpm changeset version --snapshot next
+          SNAPSHOT_VERSION="$(node -p "require('./packages/nuxt/package.json').version")"
+          BASE_VERSION="${SNAPSHOT_VERSION%%-*}"
+          NEXT_VERSION="${BASE_VERSION}-next.${GITHUB_RUN_ID}"
           npm pkg set version="$NEXT_VERSION" --prefix packages/nuxt
           echo "Set preview version: $NEXT_VERSION"
 
@@ -120,6 +113,16 @@ jobs:
             exit 1
           fi
 
+      - name: Set deterministic prerelease version
+        if: github.event_name == 'release' && github.event.release.prerelease
+        shell: bash
+        run: |
+          CURRENT_VERSION="$(node -p "require('./packages/nuxt/package.json').version")"
+          BASE_VERSION="${CURRENT_VERSION%%-*}"
+          NEXT_VERSION="${BASE_VERSION}-next.${GITHUB_RUN_ID}"
+          npm pkg set version="$NEXT_VERSION" --prefix packages/nuxt
+          echo "Set prerelease version: $NEXT_VERSION"
+
       - name: Typecheck workspace
         run: pnpm typecheck
 
@@ -139,11 +142,18 @@ jobs:
         id: dist
         shell: bash
         env:
+          IS_PRERELEASE: ${{ github.event.release.prerelease || false }}
           RELEASE_VERSION: ${{ github.event.inputs.version }}
         run: |
           DIST_TAG="latest"
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "$RELEASE_VERSION" = "next" ]; then
-            DIST_TAG="next"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            if [ "$RELEASE_VERSION" = "next" ]; then
+              DIST_TAG="next"
+            fi
+          else
+            if [ "$IS_PRERELEASE" = "true" ]; then
+              DIST_TAG="next"
+            fi
           fi
 
           echo "dist_tag=$DIST_TAG" >> "$GITHUB_OUTPUT"
