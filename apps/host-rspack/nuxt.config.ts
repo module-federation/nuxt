@@ -8,6 +8,8 @@ export default defineNuxtConfig({
   moduleFederation: {
     config: {
       name: "hostRspack",
+      // MF type generation is configured for the Vite examples only.
+      dts: false,
       remotes: {
         remote: {
           type: "var",

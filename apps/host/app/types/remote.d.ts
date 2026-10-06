@@ -1,16 +1,6 @@
-declare module "remote/Widget" {
-  import type { Component } from "vue";
-  const component: Component;
-  export default component;
-}
-
-declare module "remote/Counter" {
-  import type { Component } from "vue";
-  const component: Component;
-  export default component;
-}
-
-declare module "remote/bridge/export-app" {
+// Fallback until the remote's MF types are downloaded into `@mf-types`. A
+// wildcard declaration lets those downloaded types take precedence.
+declare module "remote/bridge/*" {
   const createProvider: () => {
     render: (info: Record<string, unknown>) => void | Promise<void>;
     destroy: (info: { dom: HTMLElement }) => void;

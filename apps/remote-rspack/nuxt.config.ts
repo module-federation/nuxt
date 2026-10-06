@@ -16,6 +16,8 @@ export default defineNuxtConfig({
     exposedDir,
     config: {
       name: "remote",
+      // MF type generation is configured for the Vite examples only.
+      dts: false,
       exposes: {
         "./bridge/export-app": fileURLToPath(
           new URL("../remote/app/export-app.ts", import.meta.url),

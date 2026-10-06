@@ -208,36 +208,42 @@ export function registerRemoteComponents(
       });
     }
 
+    // Nuxt types `#components` and `GlobalComponents` from these exports.
     addTypeTemplate({
-      filename: "types/module-federation-components.d.ts",
-      getContents() {
-        return `
-          import type { Component } from "vue";
-
-          ${components
-            .map(
-              (component) => `
-                declare module ${JSON.stringify(component.importPath)} {
-                  const component: Component;
-                  export default component;
-                }
-              `,
-            )
-            .join("\n")}
-
-          declare module "vue" {
-            export interface GlobalComponents {
-              ${components
-                .map((component) => `${component.componentName}: Component;`)
-                .join("\n")}
-            }
-          }
-
-          export {};
-        `;
-      },
+      filename: "remote-components.d.ts",
+      getContents: () => renderRemoteComponentTypes(components),
+    });
+    addTypeTemplate({
+      filename: "types/module-federation-remotes.d.ts",
+      getContents: () => renderRemoteModuleFallbackTypes(components),
     });
   }
+}
+
+export function renderRemoteComponentTypes(components: RemoteComponent[]) {
+  return `${components
+    .map(
+      (component) =>
+        `export declare const ${component.exportName}: typeof import(${JSON.stringify(component.importPath)})["default"];`,
+    )
+    .join("\n")}\n`;
+}
+
+// Pattern declarations only apply when a module has no resolvable types, so
+// types downloaded by MF dts into the tsconfig paths take precedence. Each
+// pattern is anchored to one component so other exposes are not typed as
+// components.
+export function renderRemoteModuleFallbackTypes(components: RemoteComponent[]) {
+  return `${components
+    .map(
+      (
+        component,
+      ) => `declare module ${JSON.stringify(`${component.importPath}*`)} {
+  const component: import("vue").Component;
+  export default component;
+}`,
+    )
+    .join("\n\n")}\n`;
 }
 
 async function fetchRemoteManifest(

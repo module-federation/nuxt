@@ -2,6 +2,10 @@
 const count = ref(0);
 const hydrated = ref(false);
 
+const slots = defineSlots<{
+  footer(): any;
+}>();
+
 onMounted(() => {
   hydrated.value = true;
 });
@@ -48,6 +52,7 @@ onMounted(() => {
     >
       Remote counter: {{ count }}
     </button>
+    <slot name="footer"> Default footer </slot>
     <span
       :style="{
         alignItems: 'center',

@@ -186,3 +186,30 @@ test("client manifests preserve the default Vue share scope", async () => {
     );
   }
 });
+
+test("remote publishes exposed component types beside its manifest", async () => {
+  const publicRoot = resolve(repoRoot, "apps/remote/.output/public");
+  const manifest = JSON.parse(
+    await readFile(resolve(publicRoot, "mf-manifest.json"), "utf8"),
+  );
+  const { api, zip } = manifest.metaData?.types ?? {};
+
+  assert.equal(zip, "@mf-types.zip");
+  assert.equal(api, "@mf-types.d.ts");
+
+  // Zip entry names are stored uncompressed in the central directory.
+  const archive = await readFile(resolve(publicRoot, zip), "latin1");
+  for (const name of ["Widget", "Counter"]) {
+    assert.ok(archive.includes(`${name}.d.ts`), `${name} types are missing`);
+    assert.ok(
+      archive.includes(
+        `compiled-types/app/components/exposed/${name}.vue.d.ts`,
+      ),
+      `${name} was not compiled from its SFC`,
+    );
+  }
+  assert.match(
+    await readFile(resolve(publicRoot, api), "utf8"),
+    /REMOTE_ALIAS_IDENTIFIER\/Widget/,
+  );
+});

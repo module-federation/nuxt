@@ -10,6 +10,7 @@ Use Module Federation in Nuxt applications with `@module-federation/nuxt`, using
 - Nuxt module wiring for Module Federation hosts and remotes.
 - Convention-based component exposes from `~/components/exposed`.
 - Remote Vue components registered in Nuxt for template auto-imports.
+- Optional remote component prop, emit, and slot types through MF `dts`.
 - Server-rendered remote components in development and production on writable Node deployments.
 - Client and server remote entries plus an MF manifest at the public root.
 - `vue` and `vue-router` shared as singletons by default.

@@ -30,6 +30,7 @@ export default defineNuxtConfig({
     config: {
       name: "host",
       hostInitInjectLocation: "entry",
+      dts: { generateTypes: false },
       runtimePlugins: [
         fileURLToPath(
           new URL("./federation-browser-origin.ts", import.meta.url),

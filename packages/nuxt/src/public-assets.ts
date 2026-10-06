@@ -13,6 +13,7 @@ import {
   resolveRemoteEntryFileName,
   resolveSsrRemoteEntryFileName,
 } from "./federation-paths";
+import { resolveGeneratedTypesFileNames } from "./dts";
 import { isJsonObject, parseJsonObject } from "./json";
 import type { ModuleOptions } from "./options";
 
@@ -46,6 +47,7 @@ export function registerRemoteEntryAssetCopy(
   const ssrRemoteEntryFile = resolveSsrRemoteEntryFileName(remoteEntryFile);
   const manifestFile = resolveManifestFileName(options);
   const remoteEntryFiles = resolveFederationAssetFileNames(options);
+  const typesFiles = resolveGeneratedTypesFileNames(options.config?.dts);
 
   // Nuxt only copies buildAssetsDir from dist/client/ to .output/public/.
   // When federation entries use a non-root publicBase, their root-relative
@@ -81,6 +83,7 @@ export function registerRemoteEntryAssetCopy(
               remoteEntryFile,
               ssrRemoteEntryFile,
               buildAssetsDir,
+              typesFiles,
             ),
           );
         } else if (
@@ -178,6 +181,7 @@ function rebaseFederationManifest(
   remoteEntryFile: string,
   ssrRemoteEntryFile: string,
   buildAssetsDir: string,
+  typesFiles: string[],
 ) {
   const manifest = parseJsonObject(source);
   if (!manifest) return source;
@@ -197,6 +201,8 @@ function rebaseFederationManifest(
     manifestFile,
     ssrRemoteEntryFile,
   );
+
+  rebaseManifestTypes(metaData.types, outputBase, manifestFile, typesFiles);
 
   if (shouldUseAutoPublicPath(metaData.publicPath)) {
     metaData.publicPath = "auto";
@@ -227,6 +233,25 @@ function rebaseManifestEntry(
     manifestPublicDir(outputBase, manifestFile),
     publicFileDir(outputBase, entryFile),
   );
+}
+
+function rebaseManifestTypes(
+  types: unknown,
+  outputBase: string,
+  manifestFile: string,
+  typesFiles: string[],
+) {
+  if (!isJsonObject(types)) return;
+
+  for (const field of ["zip", "api"]) {
+    const file = typesFiles.find((name) => name === types[field]);
+    if (!file) continue;
+
+    types[field] = `${resolveRelativeUrl(
+      manifestPublicDir(outputBase, manifestFile),
+      publicFileDir(outputBase, file),
+    )}${posix.basename(file)}`;
+  }
 }
 
 function getManifestAssetEntries(manifest: Record<string, unknown>) {
