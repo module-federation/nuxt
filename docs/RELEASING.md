@@ -61,7 +61,7 @@ The workflow creates a Changesets snapshot version and publishes it under the np
 
 A GitHub prerelease also publishes under `next`. Its tag must match the base version in `packages/nuxt/package.json`; the workflow derives a rerun-safe `<base>-next.<workflow-run-id>` npm version.
 
-Converting that GitHub prerelease to a stable release does not republish it. After the stable version PR is merged, run `Release` manually with `version=latest` and `branch=main`.
+To promote that prerelease, edit the GitHub release and switch it from pre-release to the latest release. That runs `Release` again and publishes the base version with the npm `latest` dist-tag.
 
 ## First `0.1.0` checklist
 

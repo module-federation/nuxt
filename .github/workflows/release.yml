@@ -2,7 +2,9 @@ name: Release
 
 on:
   release:
-    types: [published]
+    # `published` covers pre-releases, including ones published from drafts.
+    # `released` covers stable releases and pre-releases switched to stable.
+    types: [published, released]
   workflow_dispatch:
     inputs:
       version:
@@ -28,6 +30,11 @@ concurrency:
 
 jobs:
   publish:
+    # A stable release fires both `published` and `released`; publish once.
+    if: >-
+      github.event_name != 'release' ||
+      github.event.action == 'released' ||
+      github.event.release.prerelease
     runs-on: ubuntu-latest
     environment: Publish
     steps:
