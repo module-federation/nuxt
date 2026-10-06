@@ -216,13 +216,15 @@ export default defineNuxtConfig({
 });
 ```
 
-During Vite setup, the module compares manifest-provided shared versions with the host's installed versions. Major-version differences produce a warning because the Vite server uses the host's copy without runtime version negotiation. Rspack uses its federation share scope for server dependencies.
+During Vite setup, the module compares manifest-provided shared versions with the host's installed versions. Major-version differences produce a warning because the Vite server uses the host's copy without runtime version negotiation. Rspack also uses the host's installed Vue for SSR under the default shared Vue configuration and reports Vue version mismatches. Other Rspack server shares continue to use the federation share scope.
 
 When a shared dependency uses `import: false`, it is not bundled as a local federation provider, but SSR remote loading still evaluates its bare import in the host process. The host must install that dependency; when `requiredVersion` is set, setup validates the installed version and fails with the package name before remote loading begins. The dependency is also included in Nitro's standalone trace.
 
 Server exposes bundle their non-shared npm dependencies into the published SSR graph, so a remote-only package does not need to be installed by every host. `config.ssrExternals` opts packages out of that bundling. Every consuming host must install those explicit externals at a compatible version and list them in its own `config.ssrExternals` so Nitro includes them in standalone output. The SSR loader keeps these imports as bare specifiers, preserving each package's ESM `import` export condition. Prefer `config.shared` for framework runtimes and other singleton dependencies.
 
 Advanced `@module-federation/vite/ssrEntryLoader` `resolvedShared` mappings must point to absolute files inside named, installed packages. The module stores them as package-relative descriptors so standalone output does not retain build-machine paths; app-local file mappings fail during setup with an actionable error.
+
+Rspack SSR leaves `vue` and `vue/server-renderer` as native package imports so the host renderer and remote components use one runtime. Browser federation sharing is unchanged. Keep Nuxt's default `experimental.externalVue: true`; disabling it with shared Vue SSR produces a setup error. Custom Vue implementations, `singleton: false`, and configurations that omit Vue sharing opt out of this normalization.
 
 ## Deployment contract
 

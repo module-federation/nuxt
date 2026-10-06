@@ -22,13 +22,15 @@ Nuxt exposes separate client and server configurations through `addRspackPlugin`
 
 Rspack defaults the host-level share strategy to `loaded-first`. Preloading a direct Vite ESM container with `version-first` can wait on that container's shared imports before the host has finished initializing them. A per-dependency strategy alone does not prevent this startup cycle. An explicit `config.shareStrategy` still takes precedence.
 
-The server compiler emits ESM containers using Nuxt's server Vue loader. The adapter keeps server shared dependencies eager, converts remote chunk loading into static ESM imports, and publishes the reachable SSR graph. Static imports allow the common download loader to discover every needed server chunk. The publisher rejects references to unpublished files and build-machine paths and records a fingerprint in the manifest.
+The server compiler emits ESM containers using Nuxt's server Vue loader. With the default shared Vue configuration, the server uses native `vue` and `vue/server-renderer` imports resolved from the host deployment. Vue is removed from the server federation share map so no bundled provider can introduce a second runtime through the renderer. Browser Vue sharing is unchanged. The adapter keeps other server shared dependencies eager, converts remote chunk loading into static ESM imports, and publishes the reachable SSR graph. Static imports allow the common download loader to discover every needed server chunk. The publisher rejects references to unpublished files and build-machine paths and records a fingerprint in the manifest.
 
 Production SSR loaders retain their runtime `import.meta.url` so they can find dependencies beside the deployed server, including when an external bootstrap imports the server from another working directory. Rspack's default substitution would otherwise freeze the loader's build-machine URL. Only loader modules receive this compiler rule; application modules keep their normal behavior. Development keeps installed-package resolution because Nuxt evaluates its server bundle differently and MF Vite needs its installed ModuleRunner peer.
 
 Nuxt 4.5's Rsbuild development middleware rejects cross-origin requests before applying its asset middleware. CORS headers alone cannot fix that. The adapter serves known emitted client assets before that guard. Unknown paths and non-asset routes continue through Nuxt's original handler. The examples use direct remote origins, without a host proxy.
 
 The remote's HMR client must also connect to the remote origin. Nuxt does not expose Rsbuild's `dev.client` configuration, so a narrowly scoped loader adapts Rsbuild's HMR URL calculation to use the federation runtime's public path. It preserves the socket path, authentication token, and explicit client settings. This compatibility code is tied to the tested builder version and fails with an actionable error if the expected client code changes.
+
+The native Vue path also normalizes Nuxt's resolved Vue entry aliases and traces both Vue and its renderer into standalone output. It requires Nuxt's default `experimental.externalVue: true`; disabling it while using shared Vue SSR fails during setup. Explicit custom Vue implementations, `singleton: false`, and configurations that omit Vue sharing retain their configured bundling behavior.
 
 ## Validation
 
@@ -58,6 +60,8 @@ The browser suites run these pairs in both development and production:
 Each pair checks remote markup in the HTTP response before JavaScript runs, hydration and independent counter updates, and Bridge navigation plus direct child-route reloads. Browser errors, hydration mismatches, and failed script or stylesheet requests fail the test. The two mixed hosts are temporary fixtures. The suites reject existing servers to avoid accidentally testing stale builds.
 
 Development also edits a copied Rspack remote component and checks that a Vite host receives the hot update without reloading the document or losing host and remote counter state. Application source files are not modified by this test.
+
+An isolated artifact regression loads the published remote graph beside a host deployment, initializes its container, and renders remote components in overlapping requests. It checks that loading and rendering the remote does not register another Vue runtime and that no private Vue runtime or renderer is embedded in the graph.
 
 The Node tests cover published entries and reachable chunks, custom manifest and asset paths, SSR portability, missing or incompatible host shares, recovery after network failures, and cross-origin development asset requests. The Rspack deployment regression copies the complete output outside the checkout and imports it from an empty working directory, then checks remote SSR and the cache's deployed dependency path. CI builds all four example applications before running those tests; the E2E workflow runs both browser modes.
 

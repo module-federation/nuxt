@@ -24,6 +24,10 @@ import { patchRspackServerChunkLoading } from "../packages/nuxt/src/rspack-chunk
 import { resolveRspackPackageDependency } from "../packages/nuxt/src/rspack-package-dependencies.ts";
 import { sanitizeJavaScriptComments } from "../packages/nuxt/src/javascript-comments.ts";
 import {
+  resolveServerVueExternal,
+  usesNativeServerVue,
+} from "../packages/nuxt/src/rspack-server-vue.ts";
+import {
   normalizeRspackRemotes,
   resolveRspackRemoteOptions,
 } from "../packages/nuxt/src/rspack-remotes.ts";
@@ -40,6 +44,52 @@ import { repoRoot } from "./helpers/release.mjs";
 const nuxtPackageRequire = createRequire(
   resolve(repoRoot, "packages/nuxt/package.json"),
 );
+
+test("Rspack SSR normalizes Vue runtime aliases without changing unrelated package entries", () => {
+  for (const request of [
+    "vue",
+    "vue/index.mjs",
+    "/project/node_modules/.pnpm/vue@3.5.40/node_modules/vue/dist/vue.runtime.esm-bundler.js",
+    "C:\\project\\node_modules\\vue\\index.js",
+  ]) {
+    assert.equal(resolveServerVueExternal(request), "vue");
+  }
+  for (const request of [
+    "vue/server-renderer",
+    "@vue/server-renderer",
+    "/project/node_modules/vue/server-renderer/index.js",
+    "/project/node_modules/@vue/server-renderer/dist/server-renderer.cjs.prod.js",
+  ]) {
+    assert.equal(resolveServerVueExternal(request), "vue/server-renderer");
+  }
+  for (const request of [
+    "vue/jsx-runtime",
+    "vue/compiler-sfc",
+    "@vue/devtools-api",
+    "@vue/shared",
+    "/project/vue/dist/custom.js",
+    "/project/node_modules/vue/custom.js",
+    "/project/node_modules/vue/dist/custom.js",
+    "@vue/server-renderer/dist/custom.js",
+  ]) {
+    assert.equal(resolveServerVueExternal(request), undefined);
+  }
+  assert.equal(usesNativeServerVue(["vue"]), true);
+  assert.equal(usesNativeServerVue({ vue: "^3.5.0" }), true);
+  assert.equal(usesNativeServerVue({ vue: "v3.5.0" }), true);
+  assert.equal(usesNativeServerVue({ vue: "vue-custom" }), false);
+  assert.equal(usesNativeServerVue({ vue: "vendor-vue" }), false);
+  assert.equal(
+    usesNativeServerVue({ vue: { import: false, singleton: true } }),
+    true,
+  );
+  assert.equal(
+    usesNativeServerVue({ vue: { import: "custom-vue", singleton: true } }),
+    false,
+  );
+  assert.equal(usesNativeServerVue({ vue: { singleton: false } }), false);
+  assert.equal(usesNativeServerVue({}), false);
+});
 
 test("Rspack accepts the same named and object remotes as Vite", () => {
   const remotes = {

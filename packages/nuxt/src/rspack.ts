@@ -22,6 +22,11 @@ import { registerRspackDevAssets } from "./rspack-dev-assets";
 import { patchRspackServerChunkLoading } from "./rspack-chunk-loading";
 import { resolveRspackPackageDependency } from "./rspack-package-dependencies";
 import {
+  isVersionShorthand,
+  resolveServerVueExternal,
+  usesNativeServerVue,
+} from "./rspack-server-vue";
+import {
   normalizeRspackRemotes,
   resolveRspackRemoteOptions,
 } from "./rspack-remotes";
@@ -71,6 +76,21 @@ export async function registerRspackFederationPlugin(
     options.ssr !== false &&
     ssrOptions.remoteSsr !== false &&
     hasRemotes(options.config);
+  const nativeServerVue = usesNativeServerVue(options.config?.shared);
+  if (
+    nativeServerVue &&
+    useNuxt().options.ssr &&
+    useNuxt().options.experimental.externalVue === false
+  ) {
+    throw new Error(
+      "[module-federation] Rspack SSR with shared Vue requires experimental.externalVue to be enabled so the host renderer and remote components use the same Vue runtime.",
+    );
+  }
+  if (nativeServerVue) {
+    registerNitroTraceIncludes(
+      await resolveTraceIncludes(["vue", "vue/server-renderer"], rootDir),
+    );
+  }
   if (enableSsrRemoteLoader) {
     validateImportFalseSharedPackages(rootDir, options.config?.shared);
   }
@@ -107,6 +127,7 @@ export async function registerRspackFederationPlugin(
     options.config,
     resolveRspackPackageDependency("@module-federation/vite/ssrEntryLoader"),
     portableLoaderPath,
+    nativeServerVue,
   );
   registerRspackServerExposesPublisher(useNuxt(), options, exposed);
 
@@ -136,7 +157,7 @@ export async function registerRspackFederationPlugin(
           manifest: false,
           remoteType: "script",
           runtimePlugins: serverRuntimePlugins,
-          shared: resolveServerShared(options.config?.shared),
+          shared: resolveServerShared(options.config?.shared, nativeServerVue),
           target: "node",
         }),
       ),
@@ -221,6 +242,7 @@ function registerServerFederationRuntimeBundling(
   federationConfig: ModuleOptions["config"],
   viteSsrEntryLoaderPath: string,
   portableLoaderPath: string,
+  nativeServerVue: boolean,
 ) {
   const nuxt = useNuxt();
   const remoteNames = new Set(Object.keys(federationConfig?.remotes || {}));
@@ -273,6 +295,9 @@ function registerServerFederationRuntimeBundling(
 
       config.externals = [
         ({ request }: { request?: string }) => {
+          const vueExternal =
+            nativeServerVue && request && resolveServerVueExternal(request);
+          if (vueExternal) return `module ${vueExternal}`;
           if (
             request &&
             ssrExternals.some(
@@ -473,26 +498,41 @@ function resolveRspackFederationOptions(
   };
 }
 
-function resolveServerShared(shared: RspackFederationOptions["shared"]) {
+function resolveServerShared(
+  shared: RspackFederationOptions["shared"],
+  nativeServerVue: boolean,
+) {
   if (Array.isArray(shared)) {
     return Object.fromEntries(
-      shared.map((packageName) => [packageName, { eager: true }]),
+      shared
+        .filter(
+          (packageName) =>
+            !nativeServerVue ||
+            typeof packageName !== "string" ||
+            !resolveServerVueExternal(packageName),
+        )
+        .map((packageName) => [packageName, { eager: true }]),
     );
   }
   if (!isJsonObject(shared)) return shared;
 
   return Object.fromEntries(
-    Object.entries(shared).map(([packageName, config]) => [
-      packageName,
-      typeof config === "string"
-        ? resolveServerSharedShorthand(packageName, config)
-        : { ...config, eager: true },
-    ]),
+    Object.entries(shared)
+      .filter(
+        ([packageName]) =>
+          !nativeServerVue || !resolveServerVueExternal(packageName),
+      )
+      .map(([packageName, config]) => [
+        packageName,
+        typeof config === "string"
+          ? resolveServerSharedShorthand(packageName, config)
+          : { ...config, eager: true },
+      ]),
   ) as RspackFederationOptions["shared"];
 }
 
 function resolveServerSharedShorthand(packageName: string, value: string) {
-  return value !== packageName && /^([\d^=v<>~]|[*xX]$)/.test(value)
+  return value !== packageName && isVersionShorthand(value)
     ? { eager: true, import: packageName, requiredVersion: value }
     : { eager: true, import: value };
 }

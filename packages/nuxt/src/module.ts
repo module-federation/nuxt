@@ -11,6 +11,7 @@ import { registerRemoteComponents, resolveRemoteComponents } from "./remotes";
 import { registerRemoteEntryRoutes } from "./routes";
 import { resolveSharedConfig, warnOnSharedVersionMismatches } from "./shared";
 import { registerCorsPlugin, registerFederationPlugin } from "./vite";
+import { usesNativeServerVue } from "./rspack-server-vue";
 
 const module: NuxtModule<ModuleOptions> = defineNuxtModule<ModuleOptions>({
   meta: {
@@ -40,6 +41,8 @@ const module: NuxtModule<ModuleOptions> = defineNuxtModule<ModuleOptions>({
 
     if (builder === "vite") {
       warnOnSharedVersionMismatches(nuxt, config.shared, remoteShared);
+    } else if (usesNativeServerVue(config.shared)) {
+      warnOnSharedVersionMismatches(nuxt, ["vue"], remoteShared);
     }
     registerRemoteEntryRoutes(nuxt, publicBase, options);
     registerRemoteComponents(remoteComponents, {

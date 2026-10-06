@@ -26,7 +26,7 @@ test(
             fileName: "custom-manifest.json",
             filePath: "nested",
           },
-          shared: { vue: "vue" },
+          shared: { vue: "vue", "vue-router": "vue-router" },
         },
       },
     });
@@ -94,8 +94,8 @@ test(
     );
     assert.match(
       [...serverGraph.values()].join("\n"),
-      /shareKey:\s*["']vue["'][\s\S]*?eager:\s*true/,
-      "string-form shared config was not made eager for the server build",
+      /shareKey:\s*["']vue-router["'][\s\S]*?eager:\s*true/,
+      "string-form router shared config was not made eager for the server build",
     );
   },
 );
@@ -436,5 +436,24 @@ test(
       await readFile(resolve(publicRoot, "mf-manifest.json"), "utf8"),
     );
     assert.equal(manifest.metaData.ssrRemoteEntry, undefined);
+  },
+);
+
+test(
+  "Rspack shared Vue SSR rejects Nitro bundling a separate host runtime",
+  { timeout: 30_000 },
+  async (context) => {
+    const fixtureRoot = await createNuxtFixture("remote-rspack", {
+      experimental: { externalVue: false },
+    });
+    context.after(() => rm(fixtureRoot, { force: true, recursive: true }));
+    await assert.rejects(
+      runCommand(process.execPath, [
+        nuxtCliPath("remote-rspack"),
+        "build",
+        fixtureRoot,
+      ]),
+      /Rspack SSR with shared Vue requires experimental\.externalVue/,
+    );
   },
 );
