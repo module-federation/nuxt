@@ -51,7 +51,12 @@ const module: NuxtModule<ModuleOptions> = defineNuxtModule<ModuleOptions>({
       server: renderRemoteComponents,
     });
     if (builder === "vite") {
-      registerDtsTemplates(nuxt, config.dts, Object.keys(config.remotes || {}));
+      registerDtsTemplates(
+        nuxt,
+        config.dts,
+        Object.keys(config.remotes || {}),
+        exposed,
+      );
     }
     registerRemoteEntryAssetCopy(nuxt, publicBase, options);
     if (builder === "rspack") {
