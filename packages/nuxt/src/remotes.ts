@@ -74,7 +74,7 @@ export function registerRemoteComponents(
       filename: "remote-components.mjs",
       async getContents() {
         return `
-        import { defineAsyncComponent, defineComponent, h, onMounted, ref, shallowRef } from "vue";
+        import { defineAsyncComponent, defineComponent, h, shallowRef } from "vue";
 
         const createRemoteRefProxy = ${createRemoteRefProxy.toString()};
 
@@ -92,15 +92,12 @@ export function registerRemoteComponents(
         const createClientOnlyRemote = (name, component) => defineComponent({
           name,
           setup(_, { attrs, expose, slots }) {
-            const mounted = ref(false);
             const remoteRef = createRemoteRef(expose);
-            onMounted(() => {
-              mounted.value = true;
-            });
 
-            return () => mounted.value
-              ? h(component, { ...attrs, ref: remoteRef }, slots)
-              : null;
+            // Nuxt wraps mode:"client" components with its own client-only
+            // runtime. Keep this render function VNode-shaped so that the
+            // outer wrapper never receives null during route updates.
+            return () => h(component, { ...attrs, ref: remoteRef }, slots);
           },
         });
 

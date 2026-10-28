@@ -59,6 +59,14 @@ export default defineConfig({
         baseURL: "http://localhost:4178",
       },
     },
+    {
+      name: "client-only",
+      testMatch: "**/client-only.spec.mjs",
+      use: {
+        ...devices["Desktop Chrome"],
+        baseURL: "http://localhost:4181",
+      },
+    },
     ...(mode === "dev"
       ? [
           {
@@ -97,5 +105,12 @@ export default defineConfig({
       timeout: 180_000,
       gracefulShutdown: { signal: "SIGTERM", timeout: 5_000 },
     })),
+    {
+      command: "node e2e/serve-client-only.mjs",
+      url: "http://localhost:4181/",
+      reuseExistingServer: false,
+      timeout: 180_000,
+      gracefulShutdown: { signal: "SIGTERM", timeout: 5_000 },
+    },
   ],
 });

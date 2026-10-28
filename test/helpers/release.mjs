@@ -304,21 +304,26 @@ export async function walkFiles(directory) {
   return files;
 }
 
+export function serverEnv(env = {}) {
+  return {
+    ...process.env,
+    HOST: "127.0.0.1",
+    NODE_OPTIONS: [process.env.NODE_OPTIONS, "--dns-result-order=ipv4first"]
+      .filter(Boolean)
+      .join(" "),
+    ...env,
+  };
+}
+
+// `app` is an app name under apps/ or an absolute app root.
 export function startNitro(app, port, cwd) {
-  const entry = resolve(repoRoot, `apps/${app}/.output/server/index.mjs`);
+  const appRoot = isAbsolute(app) ? app : resolve(repoRoot, `apps/${app}`);
+  const entry = resolve(appRoot, ".output/server/index.mjs");
   assert.ok(existsSync(entry), `${app} server output is missing`);
 
   const child = spawn(process.execPath, [entry], {
     cwd: cwd || dirname(entry),
-    env: {
-      ...process.env,
-      HOST: "127.0.0.1",
-      NODE_ENV: "production",
-      NODE_OPTIONS: [process.env.NODE_OPTIONS, "--dns-result-order=ipv4first"]
-        .filter(Boolean)
-        .join(" "),
-      PORT: String(port),
-    },
+    env: serverEnv({ NODE_ENV: "production", PORT: String(port) }),
     stdio: ["ignore", "pipe", "pipe"],
   });
   child.output = "";
@@ -343,14 +348,7 @@ export function startNuxtDev(app, port, cwd) {
 
   const child = spawn(process.execPath, cliArgs, {
     cwd: appRoot,
-    env: {
-      ...process.env,
-      HOST: "127.0.0.1",
-      NODE_ENV: "development",
-      NODE_OPTIONS: [process.env.NODE_OPTIONS, "--dns-result-order=ipv4first"]
-        .filter(Boolean)
-        .join(" "),
-    },
+    env: serverEnv({ NODE_ENV: "development" }),
     // Nuxt dev forks workers (including the MF dts dev worker) that inherit
     // these pipes. Give them a process group so stopProcess can signal them
     // all; an orphaned worker keeps the pipes open and the test file alive.
